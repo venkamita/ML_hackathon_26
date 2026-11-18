@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Generated outputs (regenerate with the scripts; commit selected results separately)
+outputs/clean/tracks/
+
+# Raw data stays out of the repo
+*.track
+*.nodes
+*.arcs
+*.route
+
+# Secrets
+.env
