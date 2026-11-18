@@ -174,6 +174,7 @@ def run_prediction_pipeline(
             "status": "success",
             "num_gps_points": n_points,
             "predicted_route": predicted_route,
+            "greedy_route": greedy_route,
             "unique_predicted_arcs": len(set(predicted_route)),
             "route_continuity": round(continuity, 4),
             "greedy_continuity": round(greedy_continuity, 4),
