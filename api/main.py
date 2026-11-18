@@ -121,7 +121,7 @@ def get_available_models() -> List[str]:
             if m == "nearest_arc" or (models_dir / m / "model.joblib").exists()]
 
 
-LAST_ROUTES: Dict[Tuple[str, str, str], List[int]] = {}
+LAST_ROUTES: Dict[Tuple[str, str, str], Tuple[List[int], List[int]]] = {}
 
 
 def run_prediction_pipeline(
@@ -163,7 +163,7 @@ def run_prediction_pipeline(
         decode_res = dec.decode_trip(trip, score_fn=score_fn)
         predicted_route = decode_res["predicted_route"]
         greedy_route = decode_res["greedy_route"]
-        LAST_ROUTES[(partition, trip_id, model_name)] = predicted_route
+        LAST_ROUTES[(partition, trip_id, model_name)] = (predicted_route, greedy_route)
         n_points = decode_res["num_points"]
         seg = decode_res["segment_id"]
 
@@ -203,6 +203,11 @@ def run_prediction_pipeline(
             "status": "success",
             "num_gps_points": n_points,
             "predicted_route": predicted_route,
+            "greedy_route": greedy_route,
+            # GPS coordinates for the UI's point inspector (no reference route is sent)
+            "points": {"t": trip.track["t"].round(2).tolist(),
+                       "lat": trip.track["lat"].round(6).tolist(),
+                       "lon": trip.track["lon"].round(6).tolist()},
             "unique_predicted_arcs": len(set(predicted_route)),
             "route_continuity": round(continuity, 4),
             "greedy_continuity": round(greedy_continuity, 4),
@@ -233,7 +238,8 @@ def build_map_html(trip_id: str, partition: Optional[str], model_name: str) -> s
             raise RuntimeError(res.get("error", "prediction failed"))
     trip = load_trip(DATA_ROOT, partition, trip_id)
     out = PROJECT_ROOT / "outputs" / "maps" / f"ui_map_{partition}_{trip_id}_{model_name}.html"
-    make_trip_map(trip, out, predicted_arcs=LAST_ROUTES[key])
+    pred, greedy = LAST_ROUTES[key]
+    make_trip_map(trip, out, predicted_arcs=pred, greedy_arcs=greedy)
     logger.info(f"Map served for {partition}/{trip_id} ({model_name}) -> {out.name}")
     return out.read_text(encoding="utf-8")
 

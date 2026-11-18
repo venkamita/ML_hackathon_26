@@ -52,6 +52,7 @@ def _legend_html(items: Sequence[tuple[str, str]]) -> str:
 
 def make_trip_map(trip: Trip, out_html: str | Path,
                   predicted_arcs: Optional[Sequence[int]] = None,
+                  greedy_arcs: Optional[Sequence[int]] = None,
                   gps_every: Optional[int] = None, buffer_m: float = 300,
                   max_network_arcs: int = 20000) -> Path:
     tr = trip.track.dropna(subset=["lon", "lat"])
@@ -70,21 +71,30 @@ def make_trip_map(trip: Trip, out_html: str | Path,
     # Reference route
     legend = [("Road network", COLORS["network"]), ("GPS points", COLORS["gps"])]
     if trip.has_route:
-        rt = folium.FeatureGroup(name="Reference route")
+        rt = folium.FeatureGroup(name="Reference route (Ground Truth)")
         valid = [a for a in trip.route if 0 <= a < len(trip.arcs)]
         folium.PolyLine(_arc_lines(trip, valid), color=COLORS["route"],
                         weight=5, opacity=0.8).add_to(rt)
         rt.add_to(m)
         legend.append(("Reference route", COLORS["route"]))
 
-    # Predicted route (filled in later by the HMM stage)
+    # Greedy route (raw classifier emission without HMM)
+    if greedy_arcs is not None:
+        gr = folium.FeatureGroup(name="Greedy route (No HMM)", show=False)
+        valid = [a for a in greedy_arcs if 0 <= a < len(trip.arcs)]
+        folium.PolyLine(_arc_lines(trip, valid), color="#ff7f0e",
+                        weight=2, opacity=0.7, dash_array="3 4").add_to(gr)
+        gr.add_to(m)
+        legend.append(("Greedy route (No HMM)", "#ff7f0e"))
+
+    # Predicted route (Viterbi sequence decoding)
     if predicted_arcs is not None:
-        pr = folium.FeatureGroup(name="Predicted route")
+        pr = folium.FeatureGroup(name="Predicted route (Viterbi HMM)")
         valid = [a for a in predicted_arcs if 0 <= a < len(trip.arcs)]
         folium.PolyLine(_arc_lines(trip, valid), color=COLORS["pred"],
-                        weight=3, opacity=0.9, dash_array="6 4").add_to(pr)
+                        weight=4, opacity=0.9, dash_array="6 4").add_to(pr)
         pr.add_to(m)
-        legend.append(("Predicted route", COLORS["pred"]))
+        legend.append(("Predicted route (HMM)", COLORS["pred"]))
 
     # GPS observations
     gps = folium.FeatureGroup(name=f"GPS points (every {gps_every})")

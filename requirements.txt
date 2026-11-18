@@ -13,3 +13,6 @@ scipy
 pyarrow
 fastapi
 uvicorn
+streamlit
+requests
+streamlit-folium
