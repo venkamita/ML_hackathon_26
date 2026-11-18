@@ -1,0 +1,63 @@
+{
+  "evaluation": "frozen checkpoints, usable reference labels only",
+  "repo_commit": "fe0ed7dead677c4eb9fff69cb7cec114e3484eac",
+  "dataset": {
+    "zip_sha256": "a425b35e6e6f8d3a919690c5df3a9a7df2f7c2de7343a01c50ccd6ecb45178a7",
+    "trips": 10,
+    "raw_gps_points": 19674,
+    "gps_points_with_candidates": 19674,
+    "usable_gps_points": 19634,
+    "candidate_rows": 116992,
+    "usable_candidate_rows": 116911,
+    "usable_points_without_positive": 77,
+    "usable_points_with_multiple_positives": 0,
+    "candidate_miss_rate": 0.003921768361006417,
+    "candidate_k": 8,
+    "candidate_radius_m": 50.0,
+    "label_cut_m": 40.059
+  },
+  "checkpoint_sha256": {
+    "mlp": "4831f7c97e3848d1e6f8256ab652a797c7666cdde0d51fbcae36d6fd776f8ff3",
+    "mlp_tuned": "03d26996b806da5e9e69a2195809df9c8ce68e4419347ade483d7d9e0da4127f",
+    "extra_trees": "5b313891048d926409775d572f210fa6ca9085291e6737c0aed4e0aa331fb645"
+  },
+  "metrics": {
+    "mlp": {
+      "top1_acc": 0.8056942039319548,
+      "macro_f1": 0.8842352066535528,
+      "precision_1": 0.8056942039319548,
+      "recall_1": 0.808866390550698,
+      "log_loss": 0.14364205271050995,
+      "tn": 93539,
+      "fp": 3815,
+      "fn": 3738,
+      "tp": 15819,
+      "infer_ms_per_1k_rows": 0.5368083413935846
+    },
+    "mlp_tuned": {
+      "top1_acc": 0.806407252724865,
+      "macro_f1": 0.8846643625139661,
+      "precision_1": 0.806407252724865,
+      "recall_1": 0.8095822467658639,
+      "log_loss": 0.14235972194879518,
+      "tn": 93553,
+      "fp": 3801,
+      "fn": 3724,
+      "tp": 15833,
+      "infer_ms_per_1k_rows": 0.5522491467889751
+    },
+    "extra_trees": {
+      "top1_acc": 0.8010593867780381,
+      "macro_f1": 0.8814456935608673,
+      "precision_1": 0.8010593867780381,
+      "recall_1": 0.8042133251521194,
+      "log_loss": 0.1513282258695724,
+      "tn": 93448,
+      "fp": 3906,
+      "fn": 3829,
+      "tp": 15728,
+      "infer_ms_per_1k_rows": 7.477310945932757
+    }
+  },
+  "missing_checkpoints": []
+}

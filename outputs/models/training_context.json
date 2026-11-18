@@ -1,0 +1,24 @@
+{
+  "source_commit": "ea6263ee1c74855c878877d32fe60cb0a228987f",
+  "python": "3.12.16",
+  "packages": {
+    "numpy": "2.2.6",
+    "pandas": "2.2.3",
+    "pyarrow": "19.0.1",
+    "scikit-learn": "1.6.1",
+    "joblib": "1.4.2",
+    "matplotlib": "3.11.2",
+    "optuna": "4.6.0"
+  },
+  "seed": 42,
+  "features": {
+    "train": {
+      "path": "outputs/features/features_train.parquet",
+      "sha256": "4d939625d6373859bff460104310fde15d8744323616fbd01e8794613ff60ea5"
+    },
+    "student_test": {
+      "path": "outputs/features/features_student_test.parquet",
+      "sha256": "044292e64ca8cd8e4934410e625294cee20fd99809b6a82eb898969cd248f392"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+train: shape=(1103142, 37), all_trips=80, usable_rows=1025689, usable_trips=78, positive_rate_all=16.708728%, positive_rate_usable=17.499944%, points=180274, no_positive=799, multiple_positive=20
+student_test: shape=(113648, 37), all_trips=10, usable_rows=113520, usable_trips=10, positive_rate_all=16.793080%, positive_rate_usable=16.802326%, points=19119, no_positive=46, multiple_positive=1
+fold=0: train_trips=62, val_trips=16, val_rows=189573
+fold=1: train_trips=62, val_trips=16, val_rows=280220
+fold=2: train_trips=62, val_trips=16, val_rows=181615
+fold=3: train_trips=63, val_trips=15, val_rows=198571
+fold=4: train_trips=63, val_trips=15, val_rows=175710
+mlp fold=0: top1=0.868486 macro_f1=0.920531 log_loss=0.116275 train=19.0s fold=31.0s best_epoch=21/26
+mlp fold=1: top1=0.823842 macro_f1=0.891799 log_loss=0.169947 train=5.7s fold=10.8s best_epoch=5/10
+mlp fold=2: top1=0.850993 macro_f1=0.914038 log_loss=0.109424 train=15.7s fold=26.3s best_epoch=25/30
+mlp fold=3: top1=0.888707 macro_f1=0.933765 log_loss=0.088151 train=21.8s fold=38.3s best_epoch=32/37
+mlp fold=4: top1=0.882776 macro_f1=0.930275 log_loss=0.093174 train=23.4s fold=42.4s best_epoch=40/40
+mlp five-fold CV: top1=0.862961 macro_f1=0.918082 log_loss=0.115394
+mlp student_test: {"top1_acc": 0.8622312882472932, "macro_f1": 0.9177949410040109, "precision_1": 0.8622312882472932, "recall_1": 0.864265492293174, "log_loss": 0.10452780059953187, "tn": 91812, "fp": 2634, "fn": 2589, "tp": 16485, "train_time_s": 18.370068899996113, "infer_ms_per_1k_rows": 1.1280461592658244, "confusion_matrix": [[91812, 2634], [2589, 16485]]}
+Saved artifacts to C:\Users\administrator\Documents\person-c-baselines\ML_hackathon_26\outputs\models\mlp

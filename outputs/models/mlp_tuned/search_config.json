@@ -1,0 +1,34 @@
+{
+  "model": "mlp",
+  "objective": "maximize mean five-fold top1_acc",
+  "sampler": "Optuna TPESampler",
+  "optuna_version": "4.6.0",
+  "startup_trials": 4,
+  "seed": 42,
+  "requested_total_trials": 10,
+  "fold_assignment": "sorted usable trip IDs, zero-based position modulo 5",
+  "train_feature_sha256": "4d939625d6373859bff460104310fde15d8744323616fbd01e8794613ff60ea5",
+  "search_space": {
+    "hidden_layer_sizes": [
+      "32x16",
+      "64x32",
+      "64x64",
+      "96x48"
+    ],
+    "alpha": {
+      "low": 1e-06,
+      "high": 0.01,
+      "log": true
+    },
+    "batch_size": [
+      512,
+      1024,
+      2048
+    ],
+    "learning_rate_init": {
+      "low": 0.0003,
+      "high": 0.003,
+      "log": true
+    }
+  }
+}

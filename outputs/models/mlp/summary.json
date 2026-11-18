@@ -1,0 +1,197 @@
+{
+  "model": "mlp",
+  "feature_cols": [
+    "dist_m",
+    "cand_rank",
+    "dist_minus_min_m",
+    "dist_ratio_min",
+    "n_cands_in_radius",
+    "frac_along",
+    "frac_to_end",
+    "arc_length_m",
+    "heading_diff_deg",
+    "heading_diff_undirected_deg",
+    "heading_valid",
+    "speed_mps",
+    "step_next_m",
+    "dt_prev_s",
+    "gap_before",
+    "d_prev2_m",
+    "d_prev1_m",
+    "d_next1_m",
+    "d_next2_m",
+    "d_nbr_mean_m",
+    "deg_u",
+    "deg_v",
+    "has_reverse_twin",
+    "is_fallback"
+  ],
+  "hyperparameters": {
+    "activation": "relu",
+    "alpha": 0.0001,
+    "batch_size": 1024,
+    "beta_1": 0.9,
+    "beta_2": 0.999,
+    "early_stopping": false,
+    "epsilon": 1e-08,
+    "hidden_layer_sizes": [
+      64,
+      32
+    ],
+    "learning_rate": "constant",
+    "learning_rate_init": 0.001,
+    "max_fun": 15000,
+    "max_iter": 200,
+    "momentum": 0.9,
+    "n_iter_no_change": 10,
+    "nesterovs_momentum": true,
+    "power_t": 0.5,
+    "random_state": 42,
+    "shuffle": true,
+    "solver": "adam",
+    "tol": 0.0001,
+    "validation_fraction": 0.1,
+    "verbose": false,
+    "warm_start": false
+  },
+  "n_train_rows": 356495,
+  "n_usable_train_rows": 1025689,
+  "n_student_test_rows": 113520,
+  "cv": {
+    "top1_acc": {
+      "mean": 0.8629607112253707,
+      "std": 0.026265662576145814
+    },
+    "macro_f1": {
+      "mean": 0.9180815353207166,
+      "std": 0.016641693940727204
+    },
+    "precision_1": {
+      "mean": 0.8629607112253707,
+      "std": 0.026265662576145814
+    },
+    "recall_1": {
+      "mean": 0.8667596598632205,
+      "std": 0.024903187296214862
+    },
+    "log_loss": {
+      "mean": 0.11539416928775059,
+      "std": 0.032589591538266204
+    },
+    "tn": {
+      "mean": 164124.2,
+      "std": 30023.176525810857
+    },
+    "fp": {
+      "mean": 5114.6,
+      "std": 2558.313956495567
+    },
+    "fn": {
+      "mean": 4958.8,
+      "std": 2502.22974564687
+    },
+    "tp": {
+      "mean": 30940.2,
+      "std": 8136.01823375538
+    },
+    "train_top1_acc": {
+      "mean": 0.912282757794965,
+      "std": 0.015937015946341053
+    },
+    "train_macro_f1": {
+      "mean": 0.9486652105978763,
+      "std": 0.009064200240288344
+    },
+    "train_precision_1": {
+      "mean": 0.912282757794965,
+      "std": 0.015937015946341053
+    },
+    "train_recall_1": {
+      "mean": 0.9164329593405048,
+      "std": 0.015138686793655178
+    },
+    "train_log_loss": {
+      "mean": 0.07100239160752246,
+      "std": 0.011038765986113523
+    },
+    "train_tn": {
+      "mean": 236739.0,
+      "std": 35663.86359468082
+    },
+    "train_fp": {
+      "mean": 4258.4,
+      "std": 1201.148117427655
+    },
+    "train_fn": {
+      "mean": 4038.4,
+      "std": 1140.3082039518965
+    },
+    "train_tp": {
+      "mean": 43825.2,
+      "std": 5571.6002817861945
+    },
+    "train_time_s": {
+      "mean": 17.12648895998718,
+      "std": 7.013181490995173
+    },
+    "infer_ms_per_1k_rows": {
+      "mean": 1.1913209376127303,
+      "std": 0.6508877628778068
+    }
+  },
+  "student_test": {
+    "top1_acc": 0.8622312882472932,
+    "macro_f1": 0.9177949410040109,
+    "precision_1": 0.8622312882472932,
+    "recall_1": 0.864265492293174,
+    "log_loss": 0.10452780059953187,
+    "tn": 91812,
+    "fp": 2634,
+    "fn": 2589,
+    "tp": 16485,
+    "train_time_s": 18.370068899996113,
+    "infer_ms_per_1k_rows": 1.1280461592658244,
+    "confusion_matrix": [
+      [
+        91812,
+        2634
+      ],
+      [
+        2589,
+        16485
+      ]
+    ]
+  },
+  "model_bytes": 60899,
+  "mlp_trips_per_fit": 25,
+  "mlp_max_epochs": 40,
+  "mlp_patience": 5,
+  "refit_epochs": 25,
+  "refit_trip_ids": [
+    "00000005",
+    "00000006",
+    "00000012",
+    "00000016",
+    "00000018",
+    "00000032",
+    "00000035",
+    "00000041",
+    "00000042",
+    "00000044",
+    "00000045",
+    "00000046",
+    "00000053",
+    "00000062",
+    "00000064",
+    "00000070",
+    "00000074",
+    "00000079",
+    "00000081",
+    "00000082",
+    "00000085",
+    "00000086",
+    "00000092",
+    "00000098",
+    "00000099"
+  ]
+}
