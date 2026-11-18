@@ -119,8 +119,11 @@ The reference routes for evaluator trips stay on laptop 1 and are never sent to 
 
 ## AI assistance
 
-*Team to fill in: which parts were written or drafted with AI tools, as required by the event's policy.*
+AI tools (including ChatGPT) were used extensively to assist with code generation, implementation, debugging, and understanding of the data-processing pipeline. This included data loading, exploratory data analysis, road network analysis, GPS candidate generation, feature extraction, and map visualisation using Folium. The generated code and outputs were reviewed, tested, and integrated as part of the project implementation.
 
 ## Team
 
-*Team to fill in: names and who owns which part.*
+Sharat Doddihal-PES1UG24CS430
+Arpan Joardar- PES1UG25CS805
+Shantheri Shenoy- PES1UG24CS428
+Ruthik -PES1UG25CS837
