@@ -251,8 +251,7 @@ and the EDA maps in `outputs/eda/maps/`.
 
 ## AI assistance
 
-AI tools (including ChatGPT) were used extensively to assist with code generation, implementation, debugging, and understanding of the data-processing pipeline. This included data loading, exploratory data analysis, road network analysis, GPS candidate generation, feature extraction, and map visualisation using Folium. The generated code and outputs were reviewed, tested, and integrated as part of the project implementation.
-
+AI assistance. We used AI tools (Claude by Anthropic, and ChatGPT) throughout the project. Claude helped us plan the work split and review the dataset documentation and related papers (Newson & Krumm 2009; the Kubicka et al. dataset). It drafted the code for data loading, EDA, cleaning and Folium maps, and the data-quality write-up. It also wrote the task prompts each member used to develop candidate generation, feature extraction and the model-training scripts. Later, Claude rewrote the HMM/Viterbi decoder to use our candidate set, added training-only tuning of the emission weight and the scripts for the benchmark and the final frozen scores, changed the API to run the pipeline live, and drafted this README, the presentation slides and the presenter’s guide. ChatGPT was used for coding help and debugging. Every result in this repository comes from running the code on our data; no numbers were typed in by hand. The team reviewed, ran and tested all AI-assisted code, made the design decisions (including which final pipeline to use), and every member can explain the part they own.
 ## Team
 
 Sharat Doddihal-PES1UG24CS430
