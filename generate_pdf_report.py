@@ -44,13 +44,7 @@ class NumberedCanvas(canvas.Canvas):
             self.setStrokeColor(colors.HexColor('#cccccc'))
             self.setLineWidth(0.5)
             self.line(36, 750, 612 - 36, 750)
-        # Footer
-        page_text = f'Page {self._pageNumber} of {page_count}'
-        self.drawRightString(612 - 36, 22, page_text)
-        self.drawString(36, 22, 'Confidential & Academic Submission | GitHub: https://github.com/venkamita/ML_hackathon_26')
-        self.setStrokeColor(colors.HexColor('#cccccc'))
-        self.setLineWidth(0.5)
-        self.line(36, 32, 612 - 36, 32)
+        # Footer (optional / clean)
         self.restoreState()
 
 
