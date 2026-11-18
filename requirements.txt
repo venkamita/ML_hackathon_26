@@ -11,3 +11,5 @@ optuna
 joblib
 scipy
 pyarrow
+fastapi
+uvicorn

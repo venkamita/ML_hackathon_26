@@ -20,8 +20,26 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-# Data root is the folder containing train/, student_test/, and evaluator_test/
-DATA_ROOT = PROJECT_ROOT.parent if (PROJECT_ROOT.parent / "train").is_dir() else PROJECT_ROOT
+# Data root = the folder containing train/, student_test/ and/or evaluator_test/.
+# Set PATHSNAP_DATA to override; otherwise the repo's parent folder and its
+# sub-folders are searched (e.g. "Student folder/Student folder/").
+_PARTS = ("evaluator_test", "student_test", "train")
+
+
+def _find_data_root() -> Path:
+    env = os.environ.get("PATHSNAP_DATA")
+    if env:
+        return Path(env).expanduser().resolve()
+    for base in (PROJECT_ROOT.parent, PROJECT_ROOT):
+        if any((base / p).is_dir() for p in _PARTS):
+            return base
+        for child in sorted(base.iterdir()):
+            if child.is_dir() and child != PROJECT_ROOT and any((child / p).is_dir() for p in _PARTS):
+                return child
+    return PROJECT_ROOT.parent
+
+
+DATA_ROOT = _find_data_root()
 
 from common.data_loader import load_trip, list_trips
 from hmm.viterbi import RouteDecoder
@@ -33,6 +51,8 @@ logging.basicConfig(
     datefmt="%H:%M:%S"
 )
 logger = logging.getLogger("pathsnap_api")
+logger.info(f"Data root: {DATA_ROOT} (partitions found: "
+            f"{[p for p in _PARTS if (DATA_ROOT / p).is_dir()] or 'NONE - set PATHSNAP_DATA'})")
 
 # HMM decoders. Candidates come from Person B's build_trip_candidates
 # (k=8, radius 50 m), so the HMM sees exactly the rows the models were trained on.
@@ -88,22 +108,26 @@ def get_available_partitions() -> List[str]:
     return parts
 
 
+# Models the live pipeline can score with. nearest_arc needs no file; the others
+# need outputs/models/<name>/model.joblib. nearest_arc first: distance emission +
+# HMM is the best final pipeline (outputs/hmm/final_scores_*.csv).
+LIVE_MODELS = ("nearest_arc", "conditional_logit", "gaussian_nb")
+
+
 def get_available_models() -> List[str]:
-    """Finds all trained models present in outputs/models."""
+    """Models that /predict can run live on this machine."""
     models_dir = PROJECT_ROOT / "outputs" / "models"
-    if not models_dir.is_dir():
-        return ["conditional_logit", "gaussian_nb", "nearest_arc"]
-    models = [d.name for d in sorted(models_dir.iterdir()) if d.is_dir()]
-    if "conditional_logit" in models:
-        models.remove("conditional_logit")
-        models.insert(0, "conditional_logit")
-    return models
+    return [m for m in LIVE_MODELS
+            if m == "nearest_arc" or (models_dir / m / "model.joblib").exists()]
+
+
+LAST_ROUTES: Dict[Tuple[str, str, str], List[int]] = {}
 
 
 def run_prediction_pipeline(
     trip_id: str,
     partition: Optional[str] = None,
-    model_name: str = "conditional_logit"
+    model_name: str = "nearest_arc"
 ) -> Dict[str, Any]:
     """
     Executes end-to-end route reconstruction pipeline for a given trip:
@@ -126,6 +150,10 @@ def run_prediction_pipeline(
             logger.warning(f"Trip {trip_id} not found in any partition.")
             return {"error": f"Trip {trip_id} not found", "status_code": 404}
 
+    if not (DATA_ROOT / partition / trip_id).is_dir():
+        logger.warning(f"Trip {trip_id} not found in {DATA_ROOT / partition}")
+        return {"error": f"Trip {trip_id} not found in partition {partition}", "status_code": 404}
+
     try:
         trip = load_trip(DATA_ROOT, partition, trip_id)
 
@@ -135,6 +163,7 @@ def run_prediction_pipeline(
         decode_res = dec.decode_trip(trip, score_fn=score_fn)
         predicted_route = decode_res["predicted_route"]
         greedy_route = decode_res["greedy_route"]
+        LAST_ROUTES[(partition, trip_id, model_name)] = predicted_route
         n_points = decode_res["num_points"]
         seg = decode_res["segment_id"]
 
@@ -191,6 +220,24 @@ def run_prediction_pipeline(
         return {"error": str(e), "status_code": 500}
 
 
+def build_map_html(trip_id: str, partition: Optional[str], model_name: str) -> str:
+    """Folium map of a trip with GPS, road network, reference and predicted route,
+    built on this machine so the client needs neither data nor geo libraries."""
+    from viz.folium_map import make_trip_map
+    if partition is None:
+        partition = next((p for p in _PARTS if (DATA_ROOT / p / trip_id).is_dir()), None)
+    key = (partition, trip_id, model_name)
+    if key not in LAST_ROUTES:
+        res = run_prediction_pipeline(trip_id, partition, model_name)
+        if res.get("status") != "success":
+            raise RuntimeError(res.get("error", "prediction failed"))
+    trip = load_trip(DATA_ROOT, partition, trip_id)
+    out = PROJECT_ROOT / "outputs" / "maps" / f"ui_map_{partition}_{trip_id}_{model_name}.html"
+    make_trip_map(trip, out, predicted_arcs=LAST_ROUTES[key])
+    logger.info(f"Map served for {partition}/{trip_id} ({model_name}) -> {out.name}")
+    return out.read_text(encoding="utf-8")
+
+
 # ==============================================================================
 # ASGI Application (Starlette / FastAPI Compatible)
 # ==============================================================================
@@ -198,7 +245,7 @@ def run_prediction_pipeline(
 try:
     from fastapi import FastAPI, HTTPException
     from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.responses import JSONResponse
+    from fastapi.responses import JSONResponse, HTMLResponse
 
     app = FastAPI(
         title="PathSnap Map-Matching & Route Reconstruction API",
@@ -222,7 +269,7 @@ try:
             "status": "online",
             "partitions": get_available_partitions(),
             "models": get_available_models(),
-            "endpoints": ["/trips", "/models", "/predict/{trip_id}", "/health"]
+            "endpoints": ["/trips", "/models", "/predict/{trip_id}", "/map/{trip_id}", "/health"]
         }
 
     @app.get("/health")
@@ -244,8 +291,19 @@ try:
             raise HTTPException(status_code=500, detail=str(e))
 
     @app.get("/predict/{trip_id}")
-    def predict(trip_id: str, partition: Optional[str] = None, model: str = "conditional_logit"):
-        return run_prediction_pipeline(trip_id, partition, model_name=model)
+    def predict(trip_id: str, partition: Optional[str] = None, model: str = "nearest_arc"):
+        res = run_prediction_pipeline(trip_id, partition, model_name=model)
+        if "status_code" in res:
+            return JSONResponse(res, status_code=res["status_code"])
+        return res
+
+    @app.get("/map/{trip_id}", response_class=HTMLResponse)
+    def trip_map(trip_id: str, partition: Optional[str] = None, model: str = "nearest_arc"):
+        try:
+            return HTMLResponse(build_map_html(trip_id, partition, model))
+        except Exception as e:
+            logger.error(f"Map failed for {trip_id}: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
 
 except ImportError:
     from starlette.applications import Starlette
@@ -261,7 +319,7 @@ except ImportError:
             "status": "online",
             "partitions": get_available_partitions(),
             "models": get_available_models(),
-            "endpoints": ["/trips", "/models", "/predict/{trip_id}", "/health"]
+            "endpoints": ["/trips", "/models", "/predict/{trip_id}", "/map/{trip_id}", "/health"]
         })
 
     async def health(request):
@@ -283,14 +341,25 @@ except ImportError:
     async def predict(request):
         trip_id = request.path_params.get("trip_id")
         partition = request.query_params.get("partition")
-        model = request.query_params.get("model", "conditional_logit")
+        model = request.query_params.get("model", "nearest_arc")
         res = run_prediction_pipeline(trip_id, partition, model_name=model)
         return JSONResponse(res, status_code=res.get("status_code", 200))
+
+    async def trip_map(request):
+        from starlette.responses import HTMLResponse
+        try:
+            html = build_map_html(request.path_params.get("trip_id"),
+                                  request.query_params.get("partition"),
+                                  request.query_params.get("model", "nearest_arc"))
+            return HTMLResponse(html)
+        except Exception as e:
+            return JSONResponse({"error": str(e)}, status_code=500)
 
     routes = [
         Route("/", index, methods=["GET"]),
         Route("/health", health, methods=["GET"]),
         Route("/models", get_models, methods=["GET"]),
+        Route("/map/{trip_id}", trip_map, methods=["GET"]),
         Route("/trips", get_trips, methods=["GET"]),
         Route("/predict/{trip_id}", predict, methods=["GET"]),
     ]

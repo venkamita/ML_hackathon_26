@@ -7,25 +7,16 @@ and rich interactive Folium route mapping.
 """
 from __future__ import annotations
 
-import sys
-import json
+import os
 import time
-from pathlib import Path
 import streamlit as st
 import streamlit.components.v1 as components
 import requests
 import pandas as pd
 
-# Add repo root to sys.path
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
-# Data root
-DATA_ROOT = PROJECT_ROOT.parent if (PROJECT_ROOT.parent / "train").is_dir() else PROJECT_ROOT
-
-from common.data_loader import load_trip
-from viz.folium_map import make_trip_map
+# Laptop 2 needs only streamlit, requests and pandas (ui/requirements.txt).
+# Everything else (data, models, HMM, maps) runs on Laptop 1 behind the API.
+DEFAULT_API = os.environ.get("PATHSNAP_API", "http://localhost:8000")
 
 st.set_page_config(
     page_title="PathSnap Evaluator Dashboard",
@@ -59,7 +50,7 @@ st.caption("PES University | Department of Computer Science & Engineering | Two-
 st.sidebar.header("📡 Server Connection (Laptop 1)")
 api_host = st.sidebar.text_input(
     "Laptop 1 API URL",
-    value="http://localhost:8000",
+    value=DEFAULT_API,
     help="Enter the IP address of Laptop 1, e.g., http://192.168.1.45:8000"
 )
 
@@ -98,38 +89,29 @@ try:
     if resp.status_code == 200:
         trips = resp.json().get("trips", [])
 except Exception:
-    # Local fallback if API is not yet running
-    part_dir = DATA_ROOT / partition
-    if part_dir.is_dir():
-        trips = sorted([d.name for d in part_dir.iterdir() if d.is_dir()])
+    pass  # API not reachable yet; the warning below explains what to check
 
 if not trips:
-    st.sidebar.warning(f"No trips found for '{partition}'. Ensure API is running or data exists.")
+    st.sidebar.warning(f"No trips for '{partition}'. Check the API URL above (Ping API) "
+                       f"and that Laptop 1 has the '{partition}' folder.")
     selected_trip = None
 else:
     selected_trip = st.sidebar.selectbox("Select Trip ID", trips, index=0)
 
-# Discover models from API with local folder fallback
-available_models = ["conditional_logit", "gaussian_nb", "nearest_arc"]
+# Models the API can run live (asked from Laptop 1)
+available_models = ["nearest_arc", "conditional_logit", "gaussian_nb"]
 try:
     m_resp = requests.get(f"{api_host}/models", timeout=2)
     if m_resp.status_code == 200:
-        available_models = m_resp.json().get("models", available_models)
+        available_models = m_resp.json().get("models", available_models) or available_models
 except Exception:
-    models_dir = PROJECT_ROOT / "outputs" / "models"
-    if models_dir.is_dir():
-        available_models = [d.name for d in sorted(models_dir.iterdir()) if d.is_dir()]
-        if "conditional_logit" in available_models:
-            available_models.remove("conditional_logit")
-            available_models.insert(0, "conditional_logit")
+    pass
 
+# Labels use results from outputs/hmm/final_scores_*.csv (HMM on top of each emission)
 MODEL_DISPLAY_NAMES = {
-    "conditional_logit": "Tuned Conditional Logit (Recommended - Top-1: 85.4%)",
-    "gaussian_nb": "Gaussian Naive Bayes (Top-1: 83.8%)",
-    "nearest_arc": "Spatial Distance Baseline (Newson & Krumm)",
-    "extra_trees": "Extra Trees Classifier (Teammate Model)",
-    "mlp": "Multi-Layer Perceptron (Neural Net)",
-    "mlp_tuned": "MLP Tuned (Hyperparameter Optimized)",
+    "nearest_arc": "Distance emission + HMM (final pipeline, evaluator Top-1 94.3%)",
+    "conditional_logit": "Conditional logit + HMM (evaluator Top-1 93.4%)",
+    "gaussian_nb": "Gaussian Naive Bayes + HMM",
 }
 
 model_choice = st.sidebar.selectbox(
@@ -149,7 +131,7 @@ if selected_trip:
         with st.spinner(f"Requesting prediction from Laptop 1 ({api_host}/predict/{selected_trip}) ..."):
             try:
                 endpoint = f"{api_host}/predict/{selected_trip}?partition={partition}&model={model_choice}"
-                res = requests.get(endpoint, timeout=35)
+                res = requests.get(endpoint, timeout=120)
                 if res.status_code != 200:
                     st.error(f"API Error ({res.status_code}): {res.text}")
                     data = None
@@ -205,22 +187,14 @@ if selected_trip:
             # Interactive Folium Map
             st.markdown("### 🗺️ Interactive Geographical Map (Folium)")
             try:
-                trip = load_trip(DATA_ROOT, partition, selected_trip)
-                temp_map_path = PROJECT_ROOT / "outputs" / "maps" / f"ui_map_{selected_trip}_{model_choice}.html"
-                temp_map_path.parent.mkdir(parents=True, exist_ok=True)
-
-                make_trip_map(
-                    trip=trip,
-                    out_html=temp_map_path,
-                    predicted_arcs=data.get("predicted_route", [])
-                )
-
-                with open(temp_map_path, "r", encoding="utf-8") as f:
-                    map_html = f.read()
-
-                components.html(map_html, height=600, scrolling=True)
-                st.caption("💡 **Tip:** Use the Layer Control in the top-right corner of the map to toggle raw GPS points, road network, reference route, and predicted route.")
-
+                with st.spinner("Building map on Laptop 1 ..."):
+                    m = requests.get(f"{api_host}/map/{selected_trip}",
+                                     params={"partition": partition, "model": model_choice}, timeout=60)
+                if m.status_code == 200:
+                    components.html(m.text, height=600, scrolling=True)
+                    st.caption("💡 **Tip:** Use the Layer Control in the top-right corner of the map to toggle raw GPS points, road network, reference route, and predicted route.")
+                else:
+                    st.warning(f"Could not render map: API returned {m.status_code}: {m.text[:200]}")
             except Exception as map_err:
                 st.warning(f"Could not render map: {map_err}")
 

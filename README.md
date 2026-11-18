@@ -56,8 +56,9 @@ Python 3.10+. About 1 GB of free disk space.
 python -m venv .venv
 .venv\Scripts\activate            (macOS/Linux: source .venv/bin/activate)
 pip install -r requirements.txt
-pip install fastapi uvicorn streamlit requests streamlit-folium     (API and UI)
 ```
+
+Laptop 2 (UI only) needs just `pip install -r ui/requirements.txt` (streamlit, requests, pandas): no data, models or geo libraries.
 
 Place the raw data next to the repository, e.g.
 
@@ -67,8 +68,8 @@ Place the raw data next to the repository, e.g.
     train/  student_test/  evaluator_test/
 ```
 
-Scripts take `--data-root` pointing at the folder that contains `train/`. The API looks for the
-partitions in the repo's parent folder.
+Scripts take `--data-root` pointing at the folder that contains `train/`. The API searches the
+repo's parent folder and its sub-folders for the partitions (or uses `PATHSNAP_DATA`).
 
 ## Reproducing the results
 
@@ -216,20 +217,44 @@ and the EDA maps in `outputs/eda/maps/`.
 
 ## Deployment (two laptops)
 
-| Laptop | Runs | Command |
-|---|---|---|
-| 1 (backend) | FastAPI: candidates, model, HMM, server-side metrics | `uvicorn api.main:app --host 0.0.0.0 --port 8000` |
-| 2 (UI) | Streamlit evaluator UI | `streamlit run ui/app.py` |
+**Laptop 1: backend (data, models, HMM, maps)**
 
-- On laptop 1, put `train/`, `student_test/` and `evaluator_test/` in the repo's parent folder, and
-  allow port 8000 through the Windows firewall. Use the same network (a phone hotspot is the safest).
-- In the UI sidebar, enter `http://<laptop-1 IP>:8000` and click Ping API.
-- Endpoints: `GET /health`, `GET /trips?partition=...`, `GET /models`, `GET /predict/{trip_id}?partition=...&model=...`.
-- `model=nearest_arc` runs the distance emission + HMM (the best pipeline); `model=conditional_logit`
-  runs the logit with the tuned emission weight; `gaussian_nb` also works. **LightGBM, MLP and Extra
-  Trees are listed by `/models` but are not wired into the live API.**
-- The API scores each trip live: it never reads saved predictions, and the reference route is only
-  used on laptop 1 to compute the metrics it returns.
+```
+cd pathsnap
+.venv\Scripts\activate
+uvicorn api.main:app --host 0.0.0.0 --port 8000
+```
+
+- Data: keep `train/`, `student_test/` and `evaluator_test/` in the repo's parent folder or one level
+  below it (e.g. `Student folder/Student folder/`); the API finds them automatically and prints the
+  folder it uses at startup. To point elsewhere: `set PATHSNAP_DATA=D:\path\to\data` before starting.
+- Allow TCP port 8000 in Windows Firewall (Private network), and note the IPv4 address from `ipconfig`.
+
+**Laptop 2: evaluator UI**
+
+```
+git clone https://github.com/venkamita/ML_hackathon_26.git
+cd ML_hackathon_26
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r ui/requirements.txt
+streamlit run ui/app.py
+```
+
+- In the sidebar, enter `http://<laptop-1 IP>:8000` and click **Ping API**
+  (or `set PATHSNAP_API=http://<laptop-1 IP>:8000` before starting). Use the same network for both
+  laptops; a phone hotspot is the safest.
+- Pick a partition and trip, choose the emission, and click **Reconstruct Route**: metrics come from
+  `/predict`, and the Folium map is built on Laptop 1 and served by `/map`.
+
+**API endpoints**: `GET /health`, `GET /trips?partition=...`, `GET /models`,
+`GET /predict/{trip_id}?partition=...&model=...`, `GET /map/{trip_id}?partition=...&model=...`.
+
+- `model=nearest_arc` (default) = distance emission + HMM, the final pipeline; `conditional_logit` =
+  logit with the tuned emission weight; `gaussian_nb` also works. `/models` lists only these three,
+  because LightGBM, MLP and Extra Trees are not wired into the live API.
+- The API scores each trip live and never reads saved predictions. The reference route stays on
+  Laptop 1: it is used to compute the metrics and is drawn as a layer on the map.
 
 ## Data-integrity rules
 
