@@ -1,0 +1,15 @@
+train: shape=(1103142, 37), all_trips=80, usable_rows=1025689, usable_trips=78, positive_rate_all=16.708728%, positive_rate_usable=17.499944%, points=180274, no_positive=799, multiple_positive=20
+student_test: shape=(113648, 37), all_trips=10, usable_rows=113520, usable_trips=10, positive_rate_all=16.793080%, positive_rate_usable=16.802326%, points=19119, no_positive=46, multiple_positive=1
+fold=0: train_trips=62, val_trips=16, val_rows=189573
+fold=1: train_trips=62, val_trips=16, val_rows=280220
+fold=2: train_trips=62, val_trips=16, val_rows=181615
+fold=3: train_trips=63, val_trips=15, val_rows=198571
+fold=4: train_trips=63, val_trips=15, val_rows=175710
+extra_trees fold=0: top1=0.861852 macro_f1=0.916466 log_loss=0.137026 train=21.2s fold=23.6s
+extra_trees fold=1: top1=0.819061 macro_f1=0.888825 log_loss=0.165508 train=15.5s fold=18.1s
+extra_trees fold=2: top1=0.843358 macro_f1=0.909478 log_loss=0.124618 train=22.2s fold=24.9s
+extra_trees fold=3: top1=0.881057 macro_f1=0.929192 log_loss=0.111434 train=18.6s fold=21.3s
+extra_trees fold=4: top1=0.874241 macro_f1=0.925136 log_loss=0.117336 train=21.5s fold=24.3s
+extra_trees five-fold CV: top1=0.855914 macro_f1=0.913819 log_loss=0.131185
+extra_trees student_test: {"top1_acc": 0.857053193158638, "macro_f1": 0.9146786090719401, "precision_1": 0.857053193158638, "recall_1": 0.8590751808744889, "log_loss": 0.12341732219687608, "tn": 91713, "fp": 2733, "fn": 2688, "tp": 16386, "train_time_s": 22.112981199999922, "infer_ms_per_1k_rows": 2.458907681517262, "confusion_matrix": [[91713, 2733], [2688, 16386]]}
+Saved artifacts to C:\Users\administrator\Documents\person-c-baselines\ML_hackathon_26\outputs\models\extra_trees

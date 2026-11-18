@@ -1,0 +1,12 @@
+{
+  "trial": 1,
+  "mean_cv_top1_acc": 0.8629880296592424,
+  "parameters": {
+    "hidden_layer_sizes": "64x32",
+    "alpha": 4.2079886696066345e-06,
+    "batch_size": 2048,
+    "learning_rate_init": 0.0011973917635685026
+  },
+  "completed_trials": 10,
+  "trial_count": 10
+}

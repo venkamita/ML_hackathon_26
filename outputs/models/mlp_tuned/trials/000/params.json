@@ -1,0 +1,6 @@
+{
+  "hidden_layer_sizes": "64x32",
+  "alpha": 0.0001,
+  "batch_size": 1024,
+  "learning_rate_init": 0.001
+}

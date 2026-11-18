@@ -1,0 +1,88 @@
+Selected mlp using baseline mean CV top1_acc=0.86296071.
+train: shape=(1103142, 37), all_trips=80, usable_rows=1025689, usable_trips=78, positive_rate_all=16.708728%, positive_rate_usable=17.499944%, points=180274, no_positive=799, multiple_positive=20
+fold=0: train_trips=62, val_trips=16, val_rows=189573
+fold=1: train_trips=62, val_trips=16, val_rows=280220
+fold=2: train_trips=62, val_trips=16, val_rows=181615
+fold=3: train_trips=63, val_trips=15, val_rows=198571
+fold=4: train_trips=63, val_trips=15, val_rows=175710
+trial=0 params={'hidden_layer_sizes': '64x32', 'alpha': 0.0001, 'batch_size': 1024, 'learning_rate_init': 0.001}
+mlp fold=0: top1=0.868486 macro_f1=0.920531 log_loss=0.116275 train=20.0s fold=32.2s best_epoch=21/26
+mlp fold=1: top1=0.823842 macro_f1=0.891799 log_loss=0.169947 train=5.5s fold=10.5s best_epoch=5/10
+mlp fold=2: top1=0.850993 macro_f1=0.914038 log_loss=0.109424 train=15.0s fold=25.0s best_epoch=25/30
+mlp fold=3: top1=0.888707 macro_f1=0.933765 log_loss=0.088151 train=20.9s fold=36.7s best_epoch=32/37
+mlp fold=4: top1=0.882776 macro_f1=0.930275 log_loss=0.093174 train=23.0s fold=41.3s best_epoch=40/40
+trial=0 mean_top1=0.86296071; best_trial=0 best_top1=0.86296071
+trial=1 params={'hidden_layer_sizes': '64x32', 'alpha': 4.2079886696066345e-06, 'batch_size': 2048, 'learning_rate_init': 0.0011973917635685026}
+mlp fold=0: top1=0.866582 macro_f1=0.919365 log_loss=0.118561 train=13.4s fold=22.2s best_epoch=15/20
+mlp fold=1: top1=0.823787 macro_f1=0.891765 log_loss=0.170132 train=6.2s fold=12.3s best_epoch=7/12
+mlp fold=2: top1=0.851511 macro_f1=0.914347 log_loss=0.109869 train=14.3s fold=24.7s best_epoch=27/32
+mlp fold=3: top1=0.888800 macro_f1=0.933820 log_loss=0.086844 train=19.1s fold=33.1s best_epoch=34/39
+mlp fold=4: top1=0.884260 macro_f1=0.931169 log_loss=0.093928 train=19.0s fold=32.2s best_epoch=40/40
+trial=1 mean_top1=0.86298803; best_trial=1 best_top1=0.86298803
+trial=2 params={'hidden_layer_sizes': '64x64', 'alpha': 7.068974950624607e-06, 'batch_size': 2048, 'learning_rate_init': 0.0010043328925547798}
+mlp fold=0: top1=0.865457 macro_f1=0.918676 log_loss=0.120741 train=16.0s fold=26.6s best_epoch=14/19
+mlp fold=1: top1=0.823915 macro_f1=0.891844 log_loss=0.169942 train=7.6s fold=14.6s best_epoch=7/12
+mlp fold=2: top1=0.852859 macro_f1=0.915152 log_loss=0.108305 train=23.2s fold=40.0s best_epoch=36/40
+mlp fold=3: top1=0.886425 macro_f1=0.932400 log_loss=0.090151 train=18.9s fold=32.6s best_epoch=25/30
+mlp fold=4: top1=0.882843 macro_f1=0.930316 log_loss=0.094617 train=25.3s fold=42.5s best_epoch=36/40
+trial=2 mean_top1=0.86229980; best_trial=1 best_top1=0.86298803
+trial=3 params={'hidden_layer_sizes': '64x64', 'alpha': 1.4742753159914662e-05, 'batch_size': 2048, 'learning_rate_init': 0.00047511094677356254}
+mlp fold=0: top1=0.864592 macro_f1=0.918145 log_loss=0.119420 train=32.1s fold=52.2s best_epoch=34/39
+mlp fold=1: top1=0.824410 macro_f1=0.892152 log_loss=0.165290 train=12.7s fold=23.8s best_epoch=15/20
+mlp fold=2: top1=0.851719 macro_f1=0.914471 log_loss=0.108784 train=23.1s fold=39.6s best_epoch=40/40
+mlp fold=3: top1=0.886240 macro_f1=0.932290 log_loss=0.091266 train=24.8s fold=42.8s best_epoch=39/40
+mlp fold=4: top1=0.882911 macro_f1=0.930356 log_loss=0.094765 train=24.6s fold=41.5s best_epoch=40/40
+trial=3 mean_top1=0.86197413; best_trial=1 best_top1=0.86298803
+trial=4 params={'hidden_layer_sizes': '64x32', 'alpha': 1.0567900894501666e-06, 'batch_size': 512, 'learning_rate_init': 0.00256691564312646}
+mlp fold=0: top1=0.865313 macro_f1=0.918587 log_loss=0.123347 train=5.9s fold=9.5s best_epoch=2/7
+mlp fold=1: top1=0.823769 macro_f1=0.891753 log_loss=0.165347 train=5.1s fold=9.0s best_epoch=3/8
+mlp fold=2: top1=0.851235 macro_f1=0.914182 log_loss=0.109014 train=5.9s fold=9.6s best_epoch=5/10
+mlp fold=3: top1=0.890188 macro_f1=0.934650 log_loss=0.087424 train=7.5s fold=12.3s best_epoch=7/12
+mlp fold=4: top1=0.883349 macro_f1=0.930620 log_loss=0.096067 train=12.9s fold=20.0s best_epoch=16/21
+trial=4 mean_top1=0.86277074; best_trial=1 best_top1=0.86298803
+trial=5 params={'hidden_layer_sizes': '96x48', 'alpha': 0.004272274816226793, 'batch_size': 2048, 'learning_rate_init': 0.0023095036899590687}
+mlp fold=0: top1=0.867274 macro_f1=0.919789 log_loss=0.117152 train=33.2s fold=65.2s best_epoch=18/23
+mlp fold=1: top1=0.824135 macro_f1=0.891981 log_loss=0.168990 train=7.5s fold=14.7s best_epoch=5/10
+mlp fold=2: top1=0.851892 macro_f1=0.914574 log_loss=0.107860 train=10.3s fold=19.5s best_epoch=9/14
+mlp fold=3: top1=0.887103 macro_f1=0.932806 log_loss=0.089077 train=18.2s fold=36.8s best_epoch=14/19
+mlp fold=4: top1=0.882742 macro_f1=0.930255 log_loss=0.094642 train=17.9s fold=34.2s best_epoch=15/20
+trial=5 mean_top1=0.86262917; best_trial=1 best_top1=0.86298803
+trial=6 params={'hidden_layer_sizes': '32x16', 'alpha': 0.0018310523046838284, 'batch_size': 1024, 'learning_rate_init': 0.0003222473209190987}
+mlp fold=0: top1=0.867303 macro_f1=0.919807 log_loss=0.118317 train=26.1s fold=48.8s best_epoch=40/40
+mlp fold=1: top1=0.824465 macro_f1=0.892186 log_loss=0.163412 train=13.4s fold=28.4s best_epoch=24/29
+mlp fold=2: top1=0.849577 macro_f1=0.913192 log_loss=0.111751 train=17.8s fold=35.0s best_epoch=38/40
+mlp fold=3: top1=0.883217 macro_f1=0.930482 log_loss=0.094795 train=19.6s fold=38.1s best_epoch=40/40
+mlp fold=4: top1=0.882506 macro_f1=0.930113 log_loss=0.096724 train=18.9s fold=36.6s best_epoch=40/40
+trial=6 mean_top1=0.86141338; best_trial=1 best_top1=0.86298803
+trial=7 params={'hidden_layer_sizes': '64x32', 'alpha': 1.640659698127089e-06, 'batch_size': 512, 'learning_rate_init': 0.0013665518704062297}
+mlp fold=0: top1=0.866409 macro_f1=0.919259 log_loss=0.120323 train=8.4s fold=13.2s best_epoch=5/10
+mlp fold=1: top1=0.824300 macro_f1=0.892084 log_loss=0.167632 train=5.1s fold=9.1s best_epoch=3/8
+mlp fold=2: top1=0.851408 macro_f1=0.914286 log_loss=0.109179 train=7.1s fold=11.5s best_epoch=7/12
+mlp fold=3: top1=0.888738 macro_f1=0.933783 log_loss=0.088460 train=9.6s fold=15.2s best_epoch=10/15
+mlp fold=4: top1=0.884057 macro_f1=0.931047 log_loss=0.094521 train=9.8s fold=15.4s best_epoch=11/16
+trial=7 mean_top1=0.86298245; best_trial=1 best_top1=0.86298803
+trial=8 params={'hidden_layer_sizes': '32x16', 'alpha': 0.00012406594801169969, 'batch_size': 2048, 'learning_rate_init': 0.0005874855924191782}
+mlp fold=0: top1=0.867130 macro_f1=0.919701 log_loss=0.117678 train=14.7s fold=24.5s best_epoch=40/40
+mlp fold=1: top1=0.824501 macro_f1=0.892209 log_loss=0.162678 train=8.5s fold=16.3s best_epoch=25/30
+mlp fold=2: top1=0.849853 macro_f1=0.913357 log_loss=0.112138 train=10.7s fold=18.6s best_epoch=40/40
+mlp fold=3: top1=0.885006 macro_f1=0.931552 log_loss=0.093708 train=11.6s fold=20.2s best_epoch=40/40
+mlp fold=4: top1=0.883180 macro_f1=0.930519 log_loss=0.096826 train=11.4s fold=19.5s best_epoch=40/40
+trial=8 mean_top1=0.86193413; best_trial=1 best_top1=0.86298803
+trial=9 params={'hidden_layer_sizes': '96x48', 'alpha': 6.721925989448329e-05, 'batch_size': 2048, 'learning_rate_init': 0.0016080140453623}
+mlp fold=0: top1=0.867563 macro_f1=0.919966 log_loss=0.118619 train=15.0s fold=25.1s best_epoch=11/16
+mlp fold=1: top1=0.823182 macro_f1=0.891389 log_loss=0.168106 train=6.4s fold=12.6s best_epoch=4/9
+mlp fold=2: top1=0.852721 macro_f1=0.915070 log_loss=0.107804 train=11.7s fold=20.5s best_epoch=13/18
+mlp fold=3: top1=0.886425 macro_f1=0.932400 log_loss=0.088900 train=17.5s fold=30.5s best_epoch=20/25
+mlp fold=4: top1=0.881359 macro_f1=0.929422 log_loss=0.094779 train=17.1s fold=29.2s best_epoch=20/25
+trial=9 mean_top1=0.86224984; best_trial=1 best_top1=0.86298803
+student_test: shape=(113648, 37), all_trips=10, usable_rows=113520, usable_trips=10, positive_rate_all=16.793080%, positive_rate_usable=16.802326%, points=19119, no_positive=46, multiple_positive=1
+mlp fold=0: top1=0.866582 macro_f1=0.919365 log_loss=0.118561 train=12.6s fold=21.4s best_epoch=15/20
+mlp fold=1: top1=0.823787 macro_f1=0.891765 log_loss=0.170132 train=5.8s fold=11.3s best_epoch=7/12
+mlp fold=2: top1=0.851511 macro_f1=0.914347 log_loss=0.109869 train=14.1s fold=24.4s best_epoch=27/32
+mlp fold=3: top1=0.888800 macro_f1=0.933820 log_loss=0.086844 train=18.4s fold=31.9s best_epoch=34/39
+mlp fold=4: top1=0.884260 macro_f1=0.931169 log_loss=0.093928 train=18.5s fold=31.6s best_epoch=40/40
+mlp five-fold CV: top1=0.862988 macro_f1=0.918093 log_loss=0.115867
+mlp student_test: {"top1_acc": 0.8609236884774308, "macro_f1": 0.9170079884959124, "precision_1": 0.8609236884774308, "recall_1": 0.8629548075914858, "log_loss": 0.10632585524094171, "tn": 91787, "fp": 2659, "fn": 2614, "tp": 16460, "train_time_s": 16.869821200045408, "infer_ms_per_1k_rows": 0.6445780478614689, "confusion_matrix": [[91787, 2659], [2614, 16460]]}
+Saved artifacts to C:\Users\administrator\Documents\person-c-baselines\ML_hackathon_26\outputs\models\mlp_tuned
+Best trial 1: {'hidden_layer_sizes': '64x32', 'alpha': 4.2079886696066345e-06, 'batch_size': 2048, 'learning_rate_init': 0.0011973917635685026}
+Saved study and paired comparison to C:\Users\administrator\Documents\person-c-baselines\ML_hackathon_26\outputs\models\mlp_tuned
