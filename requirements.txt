@@ -5,3 +5,4 @@ networkx
 pyproj
 shapely>=2.0
 folium
+pyarrow

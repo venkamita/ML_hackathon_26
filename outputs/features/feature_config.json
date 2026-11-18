@@ -1,0 +1,50 @@
+{
+  "k": 8,
+  "radius_m": 50.0,
+  "label_cut_m": 40.059,
+  "crs": "UTM, zone chosen per trip from its mean lon/lat (trips are not all in zone 36N)",
+  "label_method": "monotone DP alignment of GPS points to the reference route (route order kept)",
+  "feature_cols": [
+    "dist_m",
+    "cand_rank",
+    "dist_minus_min_m",
+    "dist_ratio_min",
+    "n_cands_in_radius",
+    "frac_along",
+    "frac_to_end",
+    "arc_length_m",
+    "heading_diff_deg",
+    "heading_diff_undirected_deg",
+    "heading_valid",
+    "speed_mps",
+    "step_next_m",
+    "dt_prev_s",
+    "gap_before",
+    "d_prev2_m",
+    "d_prev1_m",
+    "d_next1_m",
+    "d_next2_m",
+    "d_nbr_mean_m",
+    "deg_u",
+    "deg_v",
+    "has_reverse_twin",
+    "is_fallback"
+  ],
+  "meta_cols": [
+    "partition",
+    "trip_id",
+    "point_idx",
+    "t",
+    "x",
+    "y",
+    "arc_id"
+  ],
+  "label_cols": [
+    "label",
+    "label_arc_id",
+    "label_route_pos",
+    "label_dist_m",
+    "label_usable",
+    "point_has_positive"
+  ]
+}
