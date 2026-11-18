@@ -51,6 +51,18 @@ def get_available_partitions() -> List[str]:
     return parts
 
 
+def get_available_models() -> List[str]:
+    """Finds all trained models present in outputs/models."""
+    models_dir = PROJECT_ROOT / "outputs" / "models"
+    if not models_dir.is_dir():
+        return ["conditional_logit", "gaussian_nb", "nearest_arc"]
+    models = [d.name for d in sorted(models_dir.iterdir()) if d.is_dir()]
+    if "conditional_logit" in models:
+        models.remove("conditional_logit")
+        models.insert(0, "conditional_logit")
+    return models
+
+
 def run_prediction_pipeline(
     trip_id: str,
     partition: Optional[str] = None,
@@ -188,12 +200,17 @@ try:
             "role": "Laptop 1 (Model and API Server)",
             "status": "online",
             "partitions": get_available_partitions(),
-            "endpoints": ["/trips", "/predict/{trip_id}", "/health"]
+            "models": get_available_models(),
+            "endpoints": ["/trips", "/models", "/predict/{trip_id}", "/health"]
         }
 
     @app.get("/health")
     def health():
         return {"status": "healthy", "timestamp": time.time(), "partitions": get_available_partitions()}
+
+    @app.get("/models")
+    def get_models():
+        return {"models": get_available_models()}
 
     @app.get("/trips")
     def get_trips(partition: str = "evaluator_test"):
@@ -222,11 +239,15 @@ except ImportError:
             "role": "Laptop 1 (Model and API Server)",
             "status": "online",
             "partitions": get_available_partitions(),
-            "endpoints": ["/trips", "/predict/{trip_id}", "/health"]
+            "models": get_available_models(),
+            "endpoints": ["/trips", "/models", "/predict/{trip_id}", "/health"]
         })
 
     async def health(request):
         return JSONResponse({"status": "healthy", "timestamp": time.time(), "partitions": get_available_partitions()})
+
+    async def get_models(request):
+        return JSONResponse({"models": get_available_models()})
 
     async def get_trips(request):
         partition = request.query_params.get("partition", "evaluator_test")
@@ -248,6 +269,7 @@ except ImportError:
     routes = [
         Route("/", index, methods=["GET"]),
         Route("/health", health, methods=["GET"]),
+        Route("/models", get_models, methods=["GET"]),
         Route("/trips", get_trips, methods=["GET"]),
         Route("/predict/{trip_id}", predict, methods=["GET"]),
     ]

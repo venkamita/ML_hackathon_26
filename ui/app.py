@@ -109,18 +109,33 @@ if not trips:
 else:
     selected_trip = st.sidebar.selectbox("Select Trip ID", trips, index=0)
 
+# Discover models from API with local folder fallback
+available_models = ["conditional_logit", "gaussian_nb", "nearest_arc"]
+try:
+    m_resp = requests.get(f"{api_host}/models", timeout=2)
+    if m_resp.status_code == 200:
+        available_models = m_resp.json().get("models", available_models)
+except Exception:
+    models_dir = PROJECT_ROOT / "outputs" / "models"
+    if models_dir.is_dir():
+        available_models = [d.name for d in sorted(models_dir.iterdir()) if d.is_dir()]
+        if "conditional_logit" in available_models:
+            available_models.remove("conditional_logit")
+            available_models.insert(0, "conditional_logit")
+
+MODEL_DISPLAY_NAMES = {
+    "conditional_logit": "Tuned Conditional Logit (Recommended - Top-1: 85.4%)",
+    "gaussian_nb": "Gaussian Naive Bayes (Top-1: 83.8%)",
+    "nearest_arc": "Spatial Distance Baseline (Newson & Krumm)",
+    "extra_trees": "Extra Trees Classifier (Teammate Model)",
+    "mlp": "Multi-Layer Perceptron (Neural Net)",
+    "mlp_tuned": "MLP Tuned (Hyperparameter Optimized)",
+}
+
 model_choice = st.sidebar.selectbox(
     "Classifier Emission Model",
-    [
-        "conditional_logit",
-        "gaussian_nb",
-        "nearest_arc"
-    ],
-    format_func=lambda x: {
-        "conditional_logit": "Tuned Conditional Logit (Recommended - Top-1: 85.4%)",
-        "gaussian_nb": "Gaussian Naive Bayes (Top-1: 83.8%)",
-        "nearest_arc": "Spatial Distance Baseline (Newson & Krumm)"
-    }.get(x, x),
+    available_models,
+    format_func=lambda x: MODEL_DISPLAY_NAMES.get(x, f"{x.replace('_', ' ').title()}"),
     index=0
 )
 
