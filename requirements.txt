@@ -5,4 +5,9 @@ networkx
 pyproj
 shapely>=2.0
 folium
+scikit-learn
+lightgbm
+optuna
+joblib
+scipy
 pyarrow
