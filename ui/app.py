@@ -517,22 +517,22 @@ with tab_architecture:
     st.markdown("#### 🎓 Viva Defense: Key Questions & Answers")
 
     with st.expander("Q1: Why does Greedy Point Classification produce poor route reconstruction?"):
-        st.write("""
+        st.write(r"""
         Greedy classification evaluates each GPS point in isolation ($\arg\max p(a_t \mid x_t)$).
         GPS noise ($6.68$ m std dev) and parallel service roads or overpasses frequently cause the point-level classifier to jump between adjacent roads. This yields low route continuity (~82% - 93%) and an un-drivable route.
         The HMM enforces physical vehicle dynamics via topological transition penalties.
         """)
 
     with st.expander("Q2: Why does Conditional Logit outperform standard Logistic Regression?"):
-        st.write("""
+        st.write(r"""
         Standard Logistic Regression treats every candidate arc as an independent binary classification instance ($\sigma(z)$), ignoring that the candidates belong to the same GPS point.
         Conditional Logit explicitly models candidate competition within each point via a grouped softmax:
-        $$p_i = \\frac{\\exp(\\beta^T x_i)}{\\sum_{j \\in \\text{cands}} \\exp(\\beta^T x_j)}$$
+        $$p_i = \frac{\exp(\beta^T x_i)}{\sum_{j \in \text{cands}} \exp(\beta^T x_j)}$$
         Point-constant variables (e.g. speed, $\Delta t$) naturally cancel out, focusing optimization entirely on features that discriminate between rival road arcs.
-        """);
+        """)
 
     with st.expander("Q3: Why was the classifier emission weight tuned to $w = 0.05$?"):
-        st.write("""
+        st.write(r"""
         Modern ML models (MLPs, boosted trees, logits) produce highly overconfident probabilities ($p > 0.99$), causing the emission term to dominate the HMM log-likelihood and drown out the transition penalties.
         Down-weighting the emission by $w = 0.05$ calibrates the emission scores against graph transition costs, achieving **99.36% - 99.74% route continuity** without sacrificing topological accuracy.
         """)
