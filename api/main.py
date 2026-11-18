@@ -24,7 +24,6 @@ if str(PROJECT_ROOT) not in sys.path:
 DATA_ROOT = PROJECT_ROOT.parent if (PROJECT_ROOT.parent / "train").is_dir() else PROJECT_ROOT
 
 from common.data_loader import load_trip, list_trips
-from common.geo import add_xy, arc_geometry
 from hmm.viterbi import RouteDecoder
 
 # Configure server console logging for live demo evaluation audit
@@ -35,11 +34,49 @@ logging.basicConfig(
 )
 logger = logging.getLogger("pathsnap_api")
 
-# Initialize RouteDecoder
+# HMM decoders. Candidates come from Person B's build_trip_candidates
+# (k=8, radius 50 m), so the HMM sees exactly the rows the models were trained on.
 decoder = RouteDecoder(radius_m=50.0, max_k=8, sigma_z=6.68)
 
-# Cache precomputed predictions for instantaneous responses if available
-PRECOMPUTED_CACHE: Dict[Tuple[str, str], pd.DataFrame] = {}
+# Emission weight for model probabilities, tuned on TRAIN trips only
+# (python -m hmm.tune_emission_weight). 1.0 if the file is missing.
+_w_file = PROJECT_ROOT / "outputs" / "hmm" / "emission_weight.json"
+EMISSION_WEIGHT = json.loads(_w_file.read_text())["emission_weight"] if _w_file.exists() else 1.0
+model_decoder = RouteDecoder(radius_m=50.0, max_k=8, sigma_z=6.68, emission_weight=EMISSION_WEIGHT)
+
+# Trained models are loaded once and score each requested trip live.
+# "nearest_arc" means the Gaussian distance emission (no trained model).
+MODEL_CACHE: Dict[str, Any] = {}
+LABEL_CUT_M = 40.0
+_clean_cfg = PROJECT_ROOT / "outputs" / "clean" / "cleaning_config.json"
+if _clean_cfg.exists():
+    LABEL_CUT_M = float(json.loads(_clean_cfg.read_text())["label_exclude_far_m"])
+
+
+def get_scorer(model_name: str):
+    """Returns (score_fn or None, decoder). score_fn(cands) -> per-row probabilities."""
+    if model_name == "nearest_arc":
+        return None, decoder
+    if model_name not in MODEL_CACHE:
+        import joblib
+        import models.baselines_linear as _bl
+        # model.joblib was saved by running baselines_linear.py as a script, so the
+        # pickle refers to __main__.<Class>; point those names at the real classes.
+        _main = sys.modules["__main__"]
+        for _name in ("ConditionalLogitModel", "Log1pGaussianNBModel", "NearestArcModel"):
+            if not hasattr(_main, _name):
+                setattr(_main, _name, getattr(_bl, _name))
+        path = PROJECT_ROOT / "outputs" / "models" / model_name / "model.joblib"
+        MODEL_CACHE[model_name] = joblib.load(path)
+        logger.info(f"Loaded model {model_name} from {path}")
+    model = MODEL_CACHE[model_name]
+
+    def score_fn(cands: pd.DataFrame):
+        df = cands.assign(trip_id="live")
+        probs, _ = model.predict_probs(df)
+        return probs
+
+    return score_fn, model_decoder
 
 
 def get_available_partitions() -> List[str]:
@@ -79,53 +116,34 @@ def run_prediction_pipeline(
 
     try:
         trip = load_trip(DATA_ROOT, partition, trip_id)
-        epsg = add_xy(trip.track)
-        add_xy(trip.nodes, epsg)
-        arcs_geom = arc_geometry(trip.nodes, trip.arcs)
 
-        # Check for model prediction probabilities in cache or file
-        classifier_probs: Optional[Dict[Tuple[int, int], float]] = None
-        pred_parquet = PROJECT_ROOT / "outputs" / "models" / model_name / f"pred_{partition}.parquet"
-        if pred_parquet.exists():
-            try:
-                cache_key = (model_name, partition)
-                if cache_key not in PRECOMPUTED_CACHE:
-                    logger.info(f"Loading predictions cache from {pred_parquet.name} ...")
-                    PRECOMPUTED_CACHE[cache_key] = pd.read_parquet(pred_parquet)
-                
-                df_preds = PRECOMPUTED_CACHE[cache_key]
-                trip_preds = df_preds[df_preds["trip_id"] == str(trip_id)]
-                if len(trip_preds) > 0:
-                    classifier_probs = {
-                        (int(row["point_idx"]), int(row["arc_id"])): float(row["prob"])
-                        for _, row in trip_preds.iterrows()
-                    }
-                    logger.info(f"Loaded {len(classifier_probs)} candidate probabilities from {model_name} cache.")
-            except Exception as e_cache:
-                logger.warning(f"Could not load prediction cache: {e_cache}")
-
-        # Run HMM Viterbi decoding
-        decode_res = decoder.decode(trip.track, trip.arcs, arcs_geom, classifier_probs=classifier_probs)
+        # Live pipeline: B's candidates + features -> model probabilities -> Viterbi.
+        # Nothing here reads the reference route.
+        score_fn, dec = get_scorer(model_name)
+        decode_res = dec.decode_trip(trip, score_fn=score_fn)
         predicted_route = decode_res["predicted_route"]
         greedy_route = decode_res["greedy_route"]
         n_points = decode_res["num_points"]
+        seg = decode_res["segment_id"]
 
-        # Compute Route Continuity
-        continuity = decoder.compute_route_continuity(predicted_route, trip.arcs)
-        greedy_continuity = decoder.compute_route_continuity(greedy_route, trip.arcs)
+        # Route continuity (steps across a >180 s gap are not counted)
+        continuity = dec.compute_route_continuity(predicted_route, trip.arcs, seg)
+        greedy_continuity = dec.compute_route_continuity(greedy_route, trip.arcs, seg)
 
-        # Server-side ground truth evaluation (never exposed to UI or client)
+        # Server-side ground-truth evaluation (never sent to the model; only numbers go to the UI).
+        # Same Top-1 definition as the model comparison: usable points, chosen candidate has label 1.
         accuracy = None
         greedy_acc = None
         has_route = trip.has_route
-
         if has_route:
-            ref_arcs_set = set(trip.route.values)
-            correct_points = sum(1 for a in predicted_route if a in ref_arcs_set)
-            accuracy = float(correct_points / n_points)
-
-            greedy_correct = sum(1 for a in greedy_route if a in ref_arcs_set)
-            greedy_acc = float(greedy_correct / n_points)
+            from features.build_candidates import add_labels
+            from hmm.benchmark_test_set import top1_on_usable
+            labelled, _ = add_labels(decode_res["candidates"].copy(), decode_res["track_xy"],
+                                     decode_res["geom"], trip.route, LABEL_CUT_M, trip.arcs)
+            c, n = top1_on_usable(labelled, decode_res["point_idx"], predicted_route)
+            accuracy = c / n if n else None
+            c, n = top1_on_usable(labelled, decode_res["point_idx"], greedy_route)
+            greedy_acc = c / n if n else None
 
         elapsed_ms = (time.time() - start_time) * 1000.0
 
@@ -150,7 +168,10 @@ def run_prediction_pipeline(
             "top1_route_accuracy": round(accuracy, 4) if accuracy is not None else None,
             "greedy_accuracy": round(greedy_acc, 4) if greedy_acc is not None else None,
             "inference_time_ms": round(elapsed_ms, 2),
-            "has_server_ground_truth": has_route
+            "has_server_ground_truth": has_route,
+            "num_segments": decode_res["num_segments"],
+            "emission": "gaussian distance (sigma 6.68 m)" if score_fn is None
+                        else f"{model_name} probabilities, weight {dec.emission_weight:g}",
         }
 
     except Exception as e:

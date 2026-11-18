@@ -1,0 +1,9 @@
+emission,emission_weight,hmm_top1_acc,n_usable_points
+conditional_logit,1.0,0.8932127854660212,46897
+conditional_logit,0.7,0.8998443397232232,46897
+conditional_logit,0.5,0.9090773397018999,46897
+conditional_logit,0.3,0.920655905495021,46897
+conditional_logit,0.2,0.9243021941702028,46897
+conditional_logit,0.1,0.9246860140307482,46897
+conditional_logit,0.05,0.9303366953110007,46897
+nearest_arc,1.0,0.9434078938951319,46897

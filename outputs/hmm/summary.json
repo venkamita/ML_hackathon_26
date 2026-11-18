@@ -1,0 +1,52 @@
+{
+  "conditional_logit+greedy": {
+    "top1_acc": 0.854072,
+    "route_continuity_pointweighted": 0.934983,
+    "n_usable_points": 19119,
+    "decode_seconds_total": 0.0
+  },
+  "conditional_logit+hmm": {
+    "top1_acc": 0.881584,
+    "route_continuity_pointweighted": 0.987308,
+    "n_usable_points": 19119,
+    "decode_seconds_total": 1.04
+  },
+  "conditional_logit_w0.05+greedy": {
+    "top1_acc": 0.854072,
+    "route_continuity_pointweighted": 0.934983,
+    "n_usable_points": 19119,
+    "decode_seconds_total": 0.0
+  },
+  "conditional_logit_w0.05+hmm": {
+    "top1_acc": 0.899053,
+    "route_continuity_pointweighted": 0.997389,
+    "n_usable_points": 19119,
+    "decode_seconds_total": 0.92
+  },
+  "nearest_arc+greedy": {
+    "top1_acc": 0.540614,
+    "route_continuity_pointweighted": 0.820084,
+    "n_usable_points": 19119,
+    "decode_seconds_total": 0.0
+  },
+  "nearest_arc+hmm": {
+    "top1_acc": 0.919295,
+    "route_continuity_pointweighted": 0.993315,
+    "n_usable_points": 19119,
+    "decode_seconds_total": 1.15
+  },
+  "_settings": {
+    "candidates": "Person B, k=8, radius 50 m (features_student_test.parquet)",
+    "conditional_logit_lambda": 0.010548725713234374,
+    "conditional_logit_emission_weight_tuned_on_train": 0.05,
+    "sigma_z_m": 6.68,
+    "gap_split_s": 180.0,
+    "transition_log_scores": {
+      "same_arc": -0.4307829160924542,
+      "direct_successor": -1.2039728043259361,
+      "two_hop": -3.2188758248682006,
+      "disconnected": -12.0
+    },
+    "top1_definition": "usable points; chosen candidate row has label == 1; missing true arc = wrong"
+  }
+}

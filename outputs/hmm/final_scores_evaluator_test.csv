@@ -1,0 +1,6 @@
+pipeline,top1_acc,macro_f1,route_continuity,n_usable_points
+nearest_arc + greedy,0.494805,0.697123,0.826912,19634
+nearest_arc + HMM,0.942854,0.966786,0.989571,19634
+conditional_logit + greedy,0.799022,0.88022,0.936578,19634
+conditional_logit + HMM (w=1),0.838953,0.904252,0.982754,19634
+conditional_logit + HMM (w=0.05),0.934043,0.961483,0.99359,19634

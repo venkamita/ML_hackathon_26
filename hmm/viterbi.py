@@ -1,313 +1,218 @@
 """
-PathSnap HMM and Viterbi Route Reconstruction Engine.
-Person D component: Implements state-space candidate generation,
-emission and transition modeling, and dynamic programming Viterbi decoding.
+PathSnap HMM / Viterbi route reconstruction (Person D).
+
+The decoder works on Person B's candidate table, the same rows the models
+are trained and evaluated on:
+
+    features.build_candidates.build_trip_candidates(trip)  ->  one row per
+    (GPS point, candidate arc), columns point_idx, arc_id, dist_m, t, ...
+
+Hidden states  = the candidate arcs of each GPS point.
+Emissions      = log P(arc | point) from a model, normalised per point.
+                 Without a model, the classic Gaussian GPS-noise emission
+                 exp(-0.5 (d / sigma)^2), also normalised per point, is used
+                 (Newson & Krumm 2009), so both cases are on the same scale.
+Transitions    = road-network topology between consecutive points:
+                 same arc, direct successor, 2-hop successor, else a penalty.
+Segments       = a trip is split where the GPS gap exceeds gap_s (180 s);
+                 each segment is decoded independently.
+
+Nothing here reads the reference route, so it runs on evaluator trips too.
 """
 from __future__ import annotations
 
 import math
+from collections import defaultdict
+from typing import Callable, Dict, List, Optional, Sequence
+
 import numpy as np
 import pandas as pd
-from scipy.spatial import cKDTree
-from collections import defaultdict
-from typing import List, Tuple, Dict, Optional, Any
 
-from common.geo import add_xy, arc_geometry
+SIGMA_Z_M = 6.68          # GPS noise, estimated on train by data_processing.clean
+GAP_SPLIT_S = 180.0       # Newson & Krumm; same rule as the cleaning step
+PROB_FLOOR = 1e-6
 
 
 class RouteDecoder:
     def __init__(
         self,
-        radius_m: float = 60.0,
-        max_k: int = 8,
-        sigma_z: float = 4.07,
-        beta: float = 5.0,
+        sigma_z: float = SIGMA_Z_M,
+        gap_s: float = GAP_SPLIT_S,
         self_trans_prob: float = 0.65,
         direct_trans_prob: float = 0.30,
-        disconnected_penalty: float = -12.0
+        two_hop_trans_prob: float = 0.04,
+        disconnected_penalty: float = -12.0,
+        emission_weight: float = 1.0,
+        radius_m: float = 50.0,
+        max_k: int = 8,
     ):
         """
-        HMM parameters:
-          radius_m: Spatial candidate search radius in meters.
-          max_k: Max candidate road segments to keep per GPS point.
-          sigma_z: Gaussian GPS measurement noise standard deviation in meters (from EDA).
-          beta: Transition difference penalty parameter (Newson & Krumm 2009).
-          self_trans_prob: Probability of remaining on the same segment between consecutive seconds.
-          direct_trans_prob: Probability of directly transitioning to a connected successor segment.
-          disconnected_penalty: Log-probability penalty for topologically disconnected hops.
+        sigma_z: GPS noise (m), only used when no model probabilities are given.
+        gap_s: a time gap larger than this starts a new, independent segment.
+        self_trans_prob: staying on the same arc between consecutive points.
+        direct_trans_prob: moving to an arc that starts where this one ends.
+        two_hop_trans_prob: moving two arcs ahead (short arcs, fast driving).
+        disconnected_penalty: log-score for any other move (keeps Viterbi
+            from dead-ending where the network is broken into pieces).
+        emission_weight: multiplies the log-emission. A sharp, confident model
+            (one that already uses neighbouring points as features) can
+            overpower the transitions; w < 1 softens it. Tuned on TRAIN trips
+            only (hmm/tune_emission_weight.py).
+        radius_m, max_k: candidate settings for decode_trip; keep them equal
+            to Person B's (outputs/features/feature_config.json).
         """
+        self.sigma_z = sigma_z
+        self.gap_s = gap_s
+        self.log_self = math.log(self_trans_prob)
+        self.log_direct = math.log(direct_trans_prob)
+        self.log_two_hop = math.log(two_hop_trans_prob)
+        self.disconnected_penalty = disconnected_penalty
+        self.emission_weight = emission_weight
         self.radius_m = radius_m
         self.max_k = max_k
-        self.sigma_z = sigma_z
-        self.beta = beta
-        self.self_trans_prob = self_trans_prob
-        self.direct_trans_prob = direct_trans_prob
-        self.disconnected_penalty = disconnected_penalty
 
-    def build_network_graph(self, arcs_df: pd.DataFrame) -> Tuple[Dict[int, List[int]], Dict[int, Tuple[int, int]]]:
-        """
-        Constructs adjacency map where arc_id -> list of successor arc_ids.
-        Arc i: u_i -> v_i. Arc j is a direct successor if u_j == v_i.
-        """
-        node_outgoing_arcs = defaultdict(list)
-        arc_endpoints = {}
+    # ------------------------------------------------------------------ graph
+    @staticmethod
+    def build_network_graph(arcs_df: pd.DataFrame):
+        """successors[a] = set of arcs starting at a's end node;
+        endpoints[a] = (u, v)."""
+        u = arcs_df["u"].to_numpy()
+        v = arcs_df["v"].to_numpy()
+        ids = arcs_df.index.to_numpy()
+        out_by_node: Dict[int, List[int]] = defaultdict(list)
+        for a, uu in zip(ids, u):
+            out_by_node[int(uu)].append(int(a))
+        successors = {int(a): set(out_by_node.get(int(vv), ())) for a, vv in zip(ids, v)}
+        endpoints = {int(a): (int(uu), int(vv)) for a, uu, vv in zip(ids, u, v)}
+        return successors, endpoints
 
-        for arc_id, row in arcs_df.iterrows():
-            u, v = int(row['u']), int(row['v'])
-            arc_endpoints[arc_id] = (u, v)
-            node_outgoing_arcs[u].append(arc_id)
-
-        # Adjacency: arc_id -> list of successor arcs
-        arc_successors = defaultdict(list)
-        for arc_id, (u, v) in arc_endpoints.items():
-            successors = node_outgoing_arcs.get(v, [])
-            arc_successors[arc_id] = successors
-
-        return arc_successors, arc_endpoints
-
-    def build_spatial_index(self, arcs_geom: pd.DataFrame) -> Tuple[cKDTree, np.ndarray, np.ndarray]:
-        """
-        Builds KDTree on segment midpoints and precomputes segment coordinates.
-        """
-        valid_mask = arcs_geom['valid'].values
-        valid_indices = arcs_geom.index[valid_mask].values
-
-        x1 = arcs_geom.loc[valid_mask, 'x1'].values
-        y1 = arcs_geom.loc[valid_mask, 'y1'].values
-        x2 = arcs_geom.loc[valid_mask, 'x2'].values
-        y2 = arcs_geom.loc[valid_mask, 'y2'].values
-
-        mid_x = (x1 + x2) / 2.0
-        mid_y = (y1 + y2) / 2.0
-        midpoints = np.column_stack([mid_x, mid_y])
-
-        kdtree = cKDTree(midpoints)
-        coords = np.column_stack([x1, y1, x2, y2])
-        return kdtree, valid_indices, coords
-
-    def point_segment_distance(
-        self, px: float, py: float, x1: np.ndarray, y1: np.ndarray, x2: np.ndarray, y2: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Vectorized orthogonal distance from point (px, py) to segments.
-        Returns:
-            distances: orthogonal distance in meters
-            t_clamped: projection fraction [0.0, 1.0] along segment
-        """
-        dx = x2 - x1
-        dy = y2 - y1
-        l2 = dx * dx + dy * dy
-        l2 = np.where(l2 == 0, 1e-6, l2)
-
-        t = ((px - x1) * dx + (py - y1) * dy) / l2
-        t_clamped = np.clip(t, 0.0, 1.0)
-
-        proj_x = x1 + t_clamped * dx
-        proj_y = y1 + t_clamped * dy
-        dist = np.hypot(px - proj_x, py - proj_y)
-        return dist, t_clamped
-
-    def find_candidates(
-        self,
-        px: float,
-        py: float,
-        kdtree: cKDTree,
-        valid_arc_ids: np.ndarray,
-        seg_coords: np.ndarray,
-        radius_m: float
-    ) -> List[Tuple[int, float]]:
-        """
-        Finds candidate road segments within search radius, sorted by orthogonal distance.
-        Returns list of (arc_id, distance_m).
-        """
-        # Query KDTree within buffer (radius + segment length margin)
-        query_radius = radius_m + 50.0
-        idx_list = kdtree.query_ball_point([px, py], r=query_radius)
-
-        if not idx_list:
-            # Fallback to nearest midpoint if no segments within radius
-            _, nearest_idx = kdtree.query([px, py], k=1)
-            idx_list = [nearest_idx]
-
-        c_indices = np.array(idx_list)
-        sub_coords = seg_coords[c_indices]
-        dists, _ = self.point_segment_distance(
-            px, py, sub_coords[:, 0], sub_coords[:, 1], sub_coords[:, 2], sub_coords[:, 3]
-        )
-
-        within_radius = dists <= radius_m
-        if not np.any(within_radius):
-            # Keep top 2 nearest if none strictly within radius
-            top_k = min(len(dists), 2)
-            sort_order = np.argsort(dists)[:top_k]
-        else:
-            filtered_indices = np.where(within_radius)[0]
-            sort_order = filtered_indices[np.argsort(dists[filtered_indices])[:self.max_k]]
-
-        candidates = [
-            (int(valid_arc_ids[c_indices[i]]), float(dists[i])) for i in sort_order
-        ]
-        return candidates
-
-    def compute_log_emission(self, dist_m: float, classifier_prob: Optional[float] = None) -> float:
-        """
-        Calculates log emission probability.
-        If classifier probability is available, uses log(p).
-        Otherwise uses Gaussian measurement model: N(0, sigma_z^2).
-        """
-        if classifier_prob is not None and classifier_prob > 0:
-            return math.log(max(classifier_prob, 1e-6))
-
-        # Gaussian measurement model
-        var = self.sigma_z ** 2
-        log_prob = -0.5 * math.log(2.0 * math.pi * var) - (dist_m ** 2) / (2.0 * var)
-        return log_prob
-
-    def compute_log_transition(
-        self,
-        from_arc: int,
-        to_arc: int,
-        arc_successors: Dict[int, List[int]],
-        gps_dist_m: float
-    ) -> float:
-        """
-        Calculates log transition probability P(to_arc | from_arc).
-        """
-        if from_arc == to_arc:
-            return math.log(self.self_trans_prob)
-
-        successors = arc_successors.get(from_arc, [])
-        if to_arc in successors:
-            # Direct successor transition
-            log_p = math.log(self.direct_trans_prob)
-            return log_p
-
-        # Check 2-hop reachability
-        for succ in successors:
-            if to_arc in arc_successors.get(succ, []):
-                return math.log(0.04)
-
-        # Disconnected hop penalty
+    def log_transition(self, a: int, b: int, successors, endpoints) -> float:
+        # duplicate arcs (same from/to node, different id) count as "the same arc"
+        if a == b or endpoints.get(a) == endpoints.get(b):
+            return self.log_self
+        succ = successors.get(a, ())
+        if b in succ:
+            return self.log_direct
+        for s in succ:
+            if b in successors.get(s, ()):
+                return self.log_two_hop
         return self.disconnected_penalty
 
-    def decode(
+    # -------------------------------------------------------------- emissions
+    def gaussian_probs(self, cands: pd.DataFrame) -> np.ndarray:
+        """Distance-only emission, normalised per point (no model needed)."""
+        s = np.exp(-0.5 * (cands["dist_m"].to_numpy(float) / self.sigma_z) ** 2)
+        tot = pd.Series(s).groupby(cands["point_idx"].to_numpy()).transform("sum").to_numpy()
+        return np.where(tot > 0, s / np.where(tot > 0, tot, 1), 1.0)
+
+    # ---------------------------------------------------------------- decode
+    def decode_candidates(
         self,
-        trip_track: pd.DataFrame,
-        trip_arcs: pd.DataFrame,
-        arcs_geom: pd.DataFrame,
-        classifier_probs: Optional[Dict[Tuple[int, int], float]] = None
-    ) -> Dict[str, Any]:
+        cands: pd.DataFrame,
+        arcs_df: pd.DataFrame,
+        probs: Optional[np.ndarray] = None,
+    ) -> Dict:
         """
-        Runs full Viterbi sequence decoding on the trip trajectory.
-        Returns:
-            dict containing predicted_route, greedy_route, candidates, and runtime metrics.
+        cands: Person B's candidate rows for ONE trip (point_idx, arc_id,
+               dist_m, t, cand_rank). Row order does not matter.
+        probs: per-row model probabilities aligned with `cands`, each point's
+               candidates summing to 1. None -> Gaussian distance emission.
+        Returns, per GPS point in time order: the Viterbi arc, the greedy
+        (highest-probability) arc, and the segment id.
         """
-        arc_successors, _ = self.build_network_graph(trip_arcs)
-        kdtree, valid_arc_ids, seg_coords = self.build_spatial_index(arcs_geom)
+        df = cands[["point_idx", "arc_id", "t", "cand_rank"]].copy()
+        df["p"] = self.gaussian_probs(cands) if probs is None else np.asarray(probs, float)
+        df["row"] = np.arange(len(df))
+        df = df.sort_values(["point_idx", "cand_rank"], kind="mergesort")
 
-        N = len(trip_track)
-        px_arr = trip_track['x'].values
-        py_arr = trip_track['y'].values
-        t_arr = trip_track['t'].values
+        point_ids = df["point_idx"].to_numpy()
+        starts = np.r_[0, np.flatnonzero(point_ids[1:] != point_ids[:-1]) + 1]
+        ends = np.r_[starts[1:], len(df)]
+        arcs = df["arc_id"].to_numpy().astype(int)
+        logp = self.emission_weight * np.log(np.maximum(df["p"].to_numpy(), PROB_FLOOR))
+        p = df["p"].to_numpy()
+        t_pt = df["t"].to_numpy()[starts]
+        pts = point_ids[starts]
 
-        # 1. Generate candidates and emissions for all points
-        candidates_by_step = []
-        greedy_route = []
+        successors, endpoints = self.build_network_graph(arcs_df)
+        n = len(starts)
+        seg = np.zeros(n, dtype=int)
+        if n > 1:
+            seg[1:] = np.cumsum(np.diff(t_pt) > self.gap_s)
 
-        for t in range(N):
-            px, py = px_arr[t], py_arr[t]
-            cands = self.find_candidates(px, py, kdtree, valid_arc_ids, seg_coords, self.radius_m)
-            candidates_by_step.append(cands)
-            # Greedy prediction: arc with minimum distance
-            greedy_route.append(cands[0][0])
+        greedy = np.array([arcs[s + int(np.argmax(p[s:e]))] for s, e in zip(starts, ends)])
+        viterbi = np.empty(n, dtype=int)
+        trans_cache: Dict[tuple, float] = {}
 
-        # 2. Viterbi Dynamic Programming in log-space
-        # dp[t][k] = max log-prob ending at candidate k at time step t
-        dp: List[np.ndarray] = []
-        backpointer: List[np.ndarray] = []
+        def trans(a, b):
+            key = (a, b)
+            v = trans_cache.get(key)
+            if v is None:
+                v = self.log_transition(a, b, successors, endpoints)
+                trans_cache[key] = v
+            return v
 
-        # Initialization at t = 0
-        init_cands = candidates_by_step[0]
-        init_scores = np.zeros(len(init_cands))
-        for k_idx, (arc_id, dist_m) in enumerate(init_cands):
-            c_prob = classifier_probs.get((0, arc_id)) if classifier_probs else None
-            init_scores[k_idx] = self.compute_log_emission(dist_m, c_prob)
-        dp.append(init_scores)
-
-        # Forward pass
-        for t in range(1, N):
-            curr_cands = candidates_by_step[t]
-            prev_cands = candidates_by_step[t - 1]
-            prev_dp = dp[t - 1]
-
-            dt = t_arr[t] - t_arr[t - 1]
-            dx = px_arr[t] - px_arr[t - 1]
-            dy = py_arr[t] - py_arr[t - 1]
-            gps_dist = math.hypot(dx, dy)
-
-            # If GPS gap > 180s, reset sequence
-            is_large_gap = (dt > 180.0)
-
-            curr_scores = np.zeros(len(curr_cands))
-            curr_bp = np.zeros(len(curr_cands), dtype=int)
-
-            for j, (to_arc, dist_m) in enumerate(curr_cands):
-                c_prob = classifier_probs.get((t, to_arc)) if classifier_probs else None
-                log_emission = self.compute_log_emission(dist_m, c_prob)
-
-                if is_large_gap:
-                    # Reset transition dependency
-                    best_prev_idx = 0
-                    max_trans_score = prev_dp[0]
-                else:
-                    trans_scores = np.zeros(len(prev_cands))
-                    for i, (from_arc, _) in enumerate(prev_cands):
-                        log_trans = self.compute_log_transition(from_arc, to_arc, arc_successors, gps_dist)
-                        trans_scores[i] = prev_dp[i] + log_trans
-
-                    best_prev_idx = int(np.argmax(trans_scores))
-                    max_trans_score = trans_scores[best_prev_idx]
-
-                curr_scores[j] = max_trans_score + log_emission
-                curr_bp[j] = best_prev_idx
-
-            dp.append(curr_scores)
-            backpointer.append(curr_bp)
-
-        # 3. Backtracking to reconstruct optimal sequence
-        best_last_idx = int(np.argmax(dp[-1]))
-        predicted_route = [candidates_by_step[-1][best_last_idx][0]]
-
-        for t in range(N - 1, 0, -1):
-            best_prev_idx = backpointer[t - 1][best_last_idx]
-            predicted_route.append(candidates_by_step[t - 1][best_prev_idx][0])
-            best_last_idx = best_prev_idx
-
-        predicted_route.reverse()
+        for sid in np.unique(seg):
+            idx = np.flatnonzero(seg == sid)
+            score = logp[starts[idx[0]]:ends[idx[0]]].copy()
+            back: List[np.ndarray] = []
+            for k in range(1, len(idx)):
+                ps, pe = starts[idx[k - 1]], ends[idx[k - 1]]
+                cs, ce = starts[idx[k]], ends[idx[k]]
+                prev_arcs, cur_arcs = arcs[ps:pe], arcs[cs:ce]
+                T = np.array([[trans(int(a), int(b)) for b in cur_arcs] for a in prev_arcs])
+                tot = score[:, None] + T
+                bp = np.argmax(tot, axis=0)
+                score = tot[bp, np.arange(len(cur_arcs))] + logp[cs:ce]
+                back.append(bp)
+            j = int(np.argmax(score))
+            for k in range(len(idx) - 1, -1, -1):
+                viterbi[idx[k]] = arcs[starts[idx[k]] + j]
+                if k > 0:
+                    j = int(back[k - 1][j])
 
         return {
-            "predicted_route": predicted_route,
-            "greedy_route": greedy_route,
-            "candidates_by_step": candidates_by_step,
-            "num_points": N,
+            "point_idx": pts,
+            "segment_id": seg,
+            "predicted_route": viterbi.tolist(),
+            "greedy_route": greedy.tolist(),
+            "num_points": int(n),
+            "num_segments": int(seg.max() + 1) if n else 0,
         }
 
-    def compute_route_continuity(self, route_arcs: List[int], arcs_df: pd.DataFrame) -> float:
-        """
-        Computes Route Continuity: % of consecutive transitions (s_t -> s_{t+1})
-        that are either identical (vehicle on same road) or directly connected in graph.
-        """
+    def decode_trip(
+        self,
+        trip,
+        score_fn: Optional[Callable[[pd.DataFrame], np.ndarray]] = None,
+        k: Optional[int] = None,
+        radius_m: Optional[float] = None,
+    ) -> Dict:
+        """Full pipeline for one trip (also evaluator trips with no route):
+        B's candidates + features -> model probabilities -> Viterbi."""
+        from features.build_candidates import build_trip_candidates
+        cands, tr, geom = build_trip_candidates(trip, k or self.max_k, radius_m or self.radius_m)
+        cands = cands.sort_values(["point_idx", "cand_rank"], kind="mergesort").reset_index(drop=True)
+        probs = None if score_fn is None else score_fn(cands)
+        res = self.decode_candidates(cands, trip.arcs, probs)
+        res.update({"candidates": cands, "probs": probs, "track_xy": tr, "geom": geom})
+        return res
+
+    # --------------------------------------------------------------- metrics
+    def compute_route_continuity(
+        self, route_arcs: Sequence[int], arcs_df: pd.DataFrame,
+        segment_id: Optional[Sequence[int]] = None,
+    ) -> float:
+        """% of consecutive points whose arcs are the same (or a duplicate)
+        or directly connected. Steps across a gap split are not counted."""
         if len(route_arcs) <= 1:
             return 1.0
-
-        arc_successors, _ = self.build_network_graph(arcs_df)
-        valid_transitions = 0
-        total_transitions = len(route_arcs) - 1
-
-        for i in range(total_transitions):
-            u_arc = route_arcs[i]
-            v_arc = route_arcs[i + 1]
-            if u_arc == v_arc or v_arc in arc_successors.get(u_arc, []):
-                valid_transitions += 1
-
-        return float(valid_transitions / total_transitions)
+        successors, endpoints = self.build_network_graph(arcs_df)
+        ok = tot = 0
+        for i in range(len(route_arcs) - 1):
+            if segment_id is not None and segment_id[i] != segment_id[i + 1]:
+                continue
+            a, b = int(route_arcs[i]), int(route_arcs[i + 1])
+            tot += 1
+            if a == b or endpoints.get(a) == endpoints.get(b) or b in successors.get(a, ()):
+                ok += 1
+        return ok / tot if tot else 1.0
