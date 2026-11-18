@@ -1,0 +1,6 @@
+Metric,Untuned (lambda=1e-3),Tuned (lambda=1.05e-02),Absolute Delta
+Cross-validation Macro F1-score,0.9119,0.9122,0.0003
+Student-testing Top-1 Accuracy,85.33%,85.41%,+0.08%
+Student-testing Macro F1-score,0.9124,0.9129,0.0005
+Log Loss (Student-testing),0.1306,0.1338,0.0032
+Inference Time (ms / 1k rows),1.22,0.41,-0.81

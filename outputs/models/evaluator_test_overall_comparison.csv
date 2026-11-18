@@ -1,0 +1,4 @@
+Model,Top-1 Accuracy,Macro F1,Precision (1),Recall (1),Log Loss,Latency (ms/1k)
+nearest_arc (Baseline),49.48%,0.6971,0.4948,0.4967,0.2877,0.12
+gaussian_nb,78.71%,0.873,0.7871,0.7902,0.294,1.13
+conditional_logit (Tuned),79.90%,0.8802,0.799,0.8021,0.1673,0.31

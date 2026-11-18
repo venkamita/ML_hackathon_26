@@ -1,0 +1,11 @@
+{
+  "top1_acc": 0.798971,
+  "macro_f1": 0.880189,
+  "precision_1": 0.798971,
+  "recall_1": 0.802117,
+  "log_loss": 0.167318,
+  "train_time_s": 2.3126,
+  "infer_ms_per_1k_rows": 0.3104,
+  "n_rows": 116911,
+  "n_points": 19634
+}
