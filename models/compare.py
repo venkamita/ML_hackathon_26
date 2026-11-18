@@ -16,20 +16,48 @@ def main() -> None:
     summaries = []
     for path in sorted(model_root.glob("*/summary.json")):
         summary = json.loads(path.read_text(encoding="utf-8"))
+        cv_s = summary.get("cv_summary", {})
+        cv_d = summary.get("cv", {})
+        st_m = summary.get("student_test_metrics", summary.get("student_test", {}))
+
+        def _get_val(k):
+            if k in summary:
+                return summary[k]
+            if k in cv_s:
+                return cv_s[k]
+            clean_k = k.replace("_mean", "")
+            if clean_k in cv_d and isinstance(cv_d[clean_k], dict):
+                return cv_d[clean_k].get("mean", np.nan)
+            return np.nan
+
+        def _get_std(k):
+            std_k = k.replace("_mean", "_std")
+            if std_k in summary:
+                return summary[std_k]
+            if std_k in cv_s:
+                return cv_s[std_k]
+            clean_k = k.replace("_mean", "")
+            if clean_k in cv_d and isinstance(cv_d[clean_k], dict):
+                return cv_d[clean_k].get("std", 0.0)
+            return 0.0
+
+        infer_speed = summary.get("infer_ms_per_1k_rows_mean",
+            cv_s.get("infer_ms_per_1k_rows_mean",
+            cv_d.get("infer_ms_per_1k_rows", {}).get("mean",
+            st_m.get("infer_ms_per_1k_rows", np.nan))))
+
         summaries.append({
-            "model": summary.get("model_name", path.parent.name),
-            "cv_top1_mean": summary["top1_acc_mean"],
-            "cv_top1_std": summary["top1_acc_std"],
-            "cv_log_loss_mean": summary["log_loss_mean"],
-            "cv_log_loss_std": summary["log_loss_std"],
-            "cv_macro_f1_mean": summary["macro_f1_mean"],
-            "cv_macro_f1_std": summary["macro_f1_std"],
-            "student_top1": summary["student_test_metrics"]["top1_acc"],
-            "student_macro_f1": summary["student_test_metrics"]["macro_f1"],
-            "student_log_loss": summary["student_test_metrics"]["log_loss"],
-            "infer_ms_per_1k_rows": summary["infer_ms_per_1k_rows_mean"]
-            if "infer_ms_per_1k_rows_mean" in summary
-            else summary.get("student_test_infer_ms_per_1k_rows", np.nan),
+            "model": summary.get("model_name", summary.get("model", path.parent.name)),
+            "cv_top1_mean": _get_val("top1_acc_mean"),
+            "cv_top1_std": _get_std("top1_acc_mean"),
+            "cv_log_loss_mean": _get_val("log_loss_mean"),
+            "cv_log_loss_std": _get_std("log_loss_std"),
+            "cv_macro_f1_mean": _get_val("macro_f1_mean"),
+            "cv_macro_f1_std": _get_std("macro_f1_std"),
+            "student_top1": st_m.get("top1_acc", summary.get("student_test_top1_acc", np.nan)),
+            "student_macro_f1": st_m.get("macro_f1", summary.get("student_test_macro_f1", np.nan)),
+            "student_log_loss": st_m.get("log_loss", summary.get("student_test_log_loss", np.nan)),
+            "infer_ms_per_1k_rows": infer_speed,
         })
     if not summaries:
         raise RuntimeError("No outputs/models/<name>/summary.json files found")
@@ -39,7 +67,8 @@ def main() -> None:
 
     def bar(metric, std, title, filename):
         fig, ax = plt.subplots(figsize=(9, 5))
-        ax.bar(table["model"], table[metric], yerr=table[std], capsize=4)
+        yerr = table[std] if std in table.columns and not table[std].isna().all() else None
+        ax.bar(table["model"], table[metric], yerr=yerr, capsize=4, color="#1f77b4", alpha=0.85)
         ax.set_ylabel(title)
         ax.tick_params(axis="x", rotation=30)
         ax.grid(axis="y", alpha=0.25)
@@ -47,10 +76,11 @@ def main() -> None:
         fig.savefig(model_root / filename, dpi=150)
         plt.close(fig)
 
-    bar("cv_top1_mean", "cv_top1_std", "CV Top-1 accuracy",
-        "comparison_cv_top1.png")
-    bar("cv_log_loss_mean", "cv_log_loss_std", "CV row log loss",
-        "comparison_cv_log_loss.png")
+    bar("cv_top1_mean", "cv_top1_std", "CV Top-1 Accuracy", "comparison_cv_top1.png")
+    bar("cv_log_loss_mean", "cv_log_loss_std", "CV Row Log Loss", "comparison_cv_log_loss.png")
+    bar("cv_macro_f1_mean", "cv_macro_f1_std", "CV Macro F1-score", "comparison_cv_macro_f1.png")
+    bar("student_top1", "cv_top1_std", "Student-Test Top-1 Accuracy", "comparison_student_top1.png")
+    bar("student_macro_f1", "cv_macro_f1_std", "Student-Test Macro F1-score", "comparison_student_macro_f1.png")
 
     ranked = table.sort_values(
         ["cv_top1_mean", "cv_log_loss_mean", "cv_top1_std", "infer_ms_per_1k_rows"],
