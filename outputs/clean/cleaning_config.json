@@ -1,0 +1,15 @@
+{
+  "fitted_on": "train",
+  "n_train_trips": 80,
+  "n_train_points": 208417,
+  "sigma_z_m": 6.677,
+  "sigma_method": "median over train trips of 1.4826 * median(distance GPS -> nearest reference-route arc)",
+  "suspect_reference_trips": [
+    "00000033",
+    "00000054"
+  ],
+  "redundant_point_dist_m": 13.353,
+  "max_speed_mps": 50.0,
+  "split_gap_s": 180.0,
+  "label_exclude_far_m": 40.059
+}

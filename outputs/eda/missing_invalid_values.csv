@@ -1,0 +1,3 @@
+partition,n_nan_lon,n_nan_lat,n_nan_t,n_out_of_range,n_duplicate_t,n_non_increasing_t,n_duplicate_positions,n_speed_jumps
+student_test,0,0,0,0,0,0,6,8
+train,0,0,0,0,0,0,572,1530
